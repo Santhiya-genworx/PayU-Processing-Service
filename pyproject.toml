@@ -1,0 +1,30 @@
+[project]
+name = "payu-processing-service"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "aiohttp>=3.13.3",
+    "asyncpg>=0.31.0",
+    "cloudinary>=1.44.1",
+    "fastapi>=0.135.1",
+    "flask==2.2.5",
+    "google-generativeai>=0.8.6",
+    "langchain-google-genai>=4.2.1",
+    "langgraph>=1.0.10",
+    "passlib[argon2]>=1.7.4",
+    "pillow>=12.1.1",
+    "pydantic-settings>=2.13.1",
+    "pydantic[email]>=2.12.5",
+    "pymupdf>=1.27.1",
+    "python-dotenv>=1.2.2",
+    "python-jose>=3.5.0",
+    "python-multipart>=0.0.22",
+    "redis>=7.2.1",
+    "redis-cli>=1.0.1",
+    "rq==1.15.1",
+    "rq-dashboard==0.6.1",
+    "sqlalchemy>=2.0.48",
+    "uvicorn>=0.41.0",
+]
