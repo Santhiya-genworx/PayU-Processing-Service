@@ -52,14 +52,19 @@ async def get_data_by_id(model: Type, id: int, db: AsyncSession):
     except SQLAlchemyError as err:
         raise HTTPException(status_code=500,detail=str(err))
     
-async def get_data_by_any(model: Type, db: AsyncSession, limit: Optional[int] = None, offset: Optional[int] = None, order_by = None, **kwargs):
+async def get_data_by_any(model: Type, db: AsyncSession, limit: Optional[int] = None, offset: Optional[int] = None, order_by = None, options = None, **kwargs):
     try:
         conditions = []
         for key, value in kwargs.items():
             column = getattr(model, key)
             conditions.append(column == value)
         
-        stmt = select(model).where(and_(*conditions))
+        stmt = select(model)
+        if options:
+            for opt in options:
+                stmt = stmt.options(opt)
+
+        stmt = stmt.where(and_(*conditions))
         if order_by is not None:
             stmt = stmt.order_by(order_by)
         if limit is not None:
