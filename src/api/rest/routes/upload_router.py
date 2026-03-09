@@ -1,8 +1,6 @@
 import json
 import uuid
-from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import APIRouter, Depends, File, Form, UploadFile
-from src.api.rest.dependencies import get_db
+from fastapi import APIRouter, File, Form, UploadFile
 from src.utils.file_upload import upload
 from src.utils.job_status import set_job_status, get_job_status
 from src.data.clients.redis import upload_queue
@@ -10,7 +8,7 @@ from src.data.clients.redis import upload_queue
 upload_router = APIRouter(prefix="/upload")
 
 @upload_router.post("/invoice")
-async def upload_invoice(data=Form(...), file: UploadFile = File(...), db: AsyncSession = Depends(get_db)):
+async def upload_invoice(data=Form(...), file: UploadFile = File(...)):
     file_id = str(uuid.uuid4())
     file_url = await upload(file, "invoice")
     set_job_status(file_id, "processing")
@@ -27,7 +25,7 @@ async def upload_invoice(data=Form(...), file: UploadFile = File(...), db: Async
     return {"status": "processing", "file_id": file_id}
 
 @upload_router.put("/invoice/override/{invoice_number}")
-async def override_invoice(data=Form(...), file: UploadFile = File(...), db: AsyncSession = Depends(get_db)):
+async def override_invoice(data=Form(...), file: UploadFile = File(...)):
     file_id = str(uuid.uuid4())
     file_url = await upload(file, "invoice")
     set_job_status(file_id, "processing")
@@ -44,7 +42,7 @@ async def override_invoice(data=Form(...), file: UploadFile = File(...), db: Asy
     return {"status": "processing", "file_id": file_id}
 
 @upload_router.post("/purchase-order")
-async def upload_purchase_orders(data=Form(...), file: UploadFile = File(...), db: AsyncSession = Depends(get_db)):
+async def upload_purchase_orders(data=Form(...), file: UploadFile = File(...)):
     file_id = str(uuid.uuid4())
     file_url = await upload(file, "purchase order")
     set_job_status(file_id, "processing")
@@ -53,6 +51,23 @@ async def upload_purchase_orders(data=Form(...), file: UploadFile = File(...), d
         {
             "file_id": file_id,
             "task_type": "upload_po",
+            "payload": json.loads(data),
+            "file": file_url,
+        },
+        job_timeout=300
+    )
+    return {"status": "processing", "file_id": file_id}
+
+@upload_router.post("/purchase-order/override/{po_id}")
+async def override_purchase_orders(data=Form(...), file: UploadFile = File(...)):
+    file_id = str(uuid.uuid4())
+    file_url = await upload(file, "purchase order")
+    set_job_status(file_id, "processing")
+    upload_queue.enqueue(
+        "src.tasks.payu_tasks.execute_task",
+        {
+            "file_id": file_id,
+            "task_type": "override_po",
             "payload": json.loads(data),
             "file": file_url,
         },
