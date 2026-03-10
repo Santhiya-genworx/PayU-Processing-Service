@@ -11,11 +11,8 @@ from src.utils.file_upload import upload
 
 async def uploadPurchaseOrder(po: PurchaseOrderRequest, file_url: str, db: AsyncSession = Depends(get_db)):
     try:
-        # Check Vendor Exists
         vendors = await get_data_by_any(Vendor, db, email=po.vendor.email)
-        vendor = None
-        if vendors:
-            vendor = vendors[0]
+        vendor =  vendors[0] if vendors else None
         if not vendor:
             vendor_data = {
                 "name": po.vendor.name,
@@ -32,10 +29,8 @@ async def uploadPurchaseOrder(po: PurchaseOrderRequest, file_url: str, db: Async
             await insert_data(Vendor, db, **vendor_data)
             await commit_transaction(db)
             vendors = await get_data_by_any(Vendor, db, email=po.vendor.email)
-            if vendors:
-                vendor = vendors[0]
+            vendor =  vendors[0] if vendors else None
 
-        # Check PO Exists
         try:
             existing_po = await get_data_by_any(PurchaseOrder, db, po_id=po.po_id)
             if existing_po:
@@ -44,7 +39,6 @@ async def uploadPurchaseOrder(po: PurchaseOrderRequest, file_url: str, db: Async
             if e.status_code != 404:
                 raise e
 
-        # Insert Purchase Order
         po_data = {
             "po_id": po.po_id,
             "vendor_id": vendor.id,
@@ -57,7 +51,6 @@ async def uploadPurchaseOrder(po: PurchaseOrderRequest, file_url: str, db: Async
         }
         await insert_data(PurchaseOrder, db, **po_data)
 
-        # Insert Ordered Items
         for item in po.ordered_items:
             item_data = {
                 "po_id": po.po_id,
@@ -67,7 +60,6 @@ async def uploadPurchaseOrder(po: PurchaseOrderRequest, file_url: str, db: Async
                 "total_price": item.total_price
             }
             await insert_data(OrderedItems, db, **item_data)
-
         await commit_transaction(db)
 
         return {"message": f"Purchase Order {po.po_id} uploaded successfully"}
@@ -78,60 +70,54 @@ async def uploadPurchaseOrder(po: PurchaseOrderRequest, file_url: str, db: Async
 
     except Exception as err:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(err)}")
+        raise
     
-async def overridePurchaseOrder(po: PurchaseOrderRequest, db: AsyncSession = Depends(get_db)):
+async def overridePurchaseOrder(po: PurchaseOrderRequest, file_url: str, db: AsyncSession = Depends(get_db)):
     try:
-        # Check Vendor Exists
-        vendor = await get_data_by_any(Vendor, db, email=po.vendor.email)[0]
+        vendors = await get_data_by_any(Vendor, db, email=po.vendor.email)
+        vendor = vendors[0] if vendors else None
         if not vendor:
             raise HTTPException(status_code=404, detail="Vendor not found")
 
-        # Check PO Exists
-        existing_po = await get_data_by_any(PurchaseOrder, db, po_id=po.po_id)[0]
+        existing_pos = await get_data_by_any(PurchaseOrder, db, po_id=po.po_id)
+        existing_po = existing_pos[0] if existing_pos else None
         if not existing_po:
             raise HTTPException(status_code=404, detail="Purchase Order not found")
 
-        # Validate PO belongs to Vendor
         if existing_po.vendor_id != vendor.id:
             raise HTTPException(status_code=400, detail="PO does not belong to given vendor")
 
         old_file_url = existing_po.file_url
 
-        # Update PO Fields
         updated_data = {
             "vendor_id": vendor.id,
             "gl_code": po.gl_code,
             "total_amount": po.total_amount,
             "ordered_date": po.ordered_date,
-            "file_url": po.file_url
+            "file_url": file_url,
         }
 
         await update_data_by_any(PurchaseOrder, db, {"po_id": po.po_id}, **updated_data)
-
-        # Delete Old Ordered Items
         await delete_data_by_any(OrderedItems, db, po_id=po.po_id)
 
-        # Insert New Ordered Items
         for item in po.ordered_items:
             item_data = {
                 "po_id": po.po_id,
                 "item_description": item.item_description,
                 "quantity": item.quantity,
                 "unit_price": item.unit_price,
-                "total_price": item.total_price
+                "total_price": item.total_price,
             }
             await insert_data(OrderedItems, db, **item_data)
 
-        # Insert Upload History
         history_data = {
             "po_id": po.po_id,
             "old_file_url": old_file_url,
-            "new_file_url": po.file_url
+            "new_file_url": file_url,
         }
         await insert_data(PurchaseOrderUploadHistory, db, **history_data)
-
         await commit_transaction(db)
+
         return {"message": f"Purchase Order {po.po_id} overridden successfully"}
 
     except SQLAlchemyError as err:
@@ -140,4 +126,4 @@ async def overridePurchaseOrder(po: PurchaseOrderRequest, db: AsyncSession = Dep
 
     except Exception as err:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(err)}") 
+        raise

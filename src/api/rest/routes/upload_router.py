@@ -24,7 +24,7 @@ async def upload_invoice(data=Form(...), file: UploadFile = File(...)):
     )
     return {"status": "processing", "file_id": file_id}
 
-@upload_router.put("/invoice/override/{invoice_number}")
+@upload_router.put("/invoice/override")
 async def override_invoice(data=Form(...), file: UploadFile = File(...)):
     file_id = str(uuid.uuid4())
     file_url = await upload(file, "invoice")
@@ -58,7 +58,7 @@ async def upload_purchase_orders(data=Form(...), file: UploadFile = File(...)):
     )
     return {"status": "processing", "file_id": file_id}
 
-@upload_router.post("/purchase-order/override/{po_id}")
+@upload_router.put("/purchase-order/override")
 async def override_purchase_orders(data=Form(...), file: UploadFile = File(...)):
     file_id = str(uuid.uuid4())
     file_url = await upload(file, "purchase order")
