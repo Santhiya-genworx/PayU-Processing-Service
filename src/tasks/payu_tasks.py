@@ -1,6 +1,6 @@
 import asyncio
 from src.core.services.invoice_upload_service import uploadInvoice, overrideInvoice
-from src.core.services.purchase_order_upload_service import uploadPurchaseOrder
+from src.core.services.purchase_order_upload_service import uploadPurchaseOrder, overridePurchaseOrder
 from src.core.services.extraction_service import extract_text_from_document
 from src.schemas.invoice_schema import InvoiceRequest
 from src.schemas.purchase_order_schema import PurchaseOrderRequest
@@ -35,6 +35,11 @@ async def _async_execute(task_type: str, file_id: str, data: dict):
             elif task_type == "upload_po":
                 parsed = PurchaseOrderRequest(**data["payload"])
                 await uploadPurchaseOrder(parsed, data["file"], db)
+                set_job_status(file_id, "completed")
+
+            elif task_type == "override_po":
+                parsed = PurchaseOrderRequest(**data["payload"])
+                await overridePurchaseOrder(parsed, data["file"], db)
                 set_job_status(file_id, "completed")
 
             elif task_type == "extract_invoice":
