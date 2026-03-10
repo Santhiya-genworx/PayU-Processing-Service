@@ -15,7 +15,7 @@ class Invoice(Base):
 
     invoice_id = Column(String(255), primary_key=True)
     vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=False)
-    po_id = Column(String(255),ForeignKey("purchase_orders.po_id"), nullable=False)
+    po_id = Column(String(255),ForeignKey("purchase_orders.po_id"), nullable=True)
     invoice_date = Column(Date, nullable=False)
     due_date = Column(Date, nullable=False)
     currency_code = Column(String(3), nullable=False)

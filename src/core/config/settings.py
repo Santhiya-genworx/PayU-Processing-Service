@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     cloudinary_api_key: str
     cloudinary_api_secret: str
 
-    redis_localhost: str
+    redis_host: str
     redis_port: int
     redis_db: int
 

@@ -1,6 +1,9 @@
+from typing import Optional
+
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from src.data.models.vendor_model import Vendor
 from src.data.models.invoice_model import Invoice
 from src.data.models.purchase_order_model import PurchaseOrder
 from src.data.repositories.base_repository import get_data_by_any
@@ -51,31 +54,43 @@ async def getRecentActivity(db: AsyncSession):
     except Exception as err:
         raise HTTPException(status_code=500, detail=str(err))
     
-async def getAllInvoices(db: AsyncSession):
+async def filterInvoices(search: str, db: AsyncSession):
     try:
-        invoices = await get_data_by_any(
-            Invoice,
-            db,
-            order_by=Invoice.updated_at.desc(),
-            options=[selectinload(Invoice.vendor)]
-        )
+        stmt = select(Invoice).options(selectinload(Invoice.vendor), selectinload(Invoice.invoice_items)).order_by(Invoice.updated_at.desc())
+        if search:
+            stmt = stmt.where(
+                or_(
+                    Invoice.invoice_id.ilike(f"{search}%"),
+                    Invoice.po_id.ilike(f"{search}%"),
+                    cast(Invoice.status, String).ilike(f"{search}%"),
+                    Invoice.vendor.has(Vendor.name.ilike(f"{search}%"))
+                )
+            )
 
-        invoices.sort(key=lambda x: x.updated_at, reverse=True)
+        result = await db.execute(stmt)
+        invoices = result.scalars().all()
+        print(invoices, search)
         return invoices
 
     except Exception as err:
         raise HTTPException(status_code=500, detail=str(err))
     
-async def getAllPurchaseOrders(db: AsyncSession):
+async def filterPurchaseOrders(search: str, db: AsyncSession):
     try:
-        purchase_orders = await get_data_by_any(
-            PurchaseOrder,
-            db,
-            order_by=PurchaseOrder.updated_at.desc(),
-            options=[selectinload(PurchaseOrder.vendor)]
-        )
+        stmt = select(PurchaseOrder).options(selectinload(PurchaseOrder.vendor), selectinload(PurchaseOrder.order_items)).order_by(PurchaseOrder.updated_at.desc())
+        if search:
+            stmt = stmt.where(
+                or_(
+                    PurchaseOrder.po_id.ilike(f"{search}%"),
+                    PurchaseOrder.gl_code.ilike(f"{search}%"),
+                    cast(PurchaseOrder.status, String).ilike(f"%{search}%"),
+                    PurchaseOrder.vendor.has(Vendor.name.ilike(f"{search}%"))
+                )
+            )
 
-        purchase_orders.sort(key=lambda x: x.updated_at, reverse=True)
+        result = await db.execute(stmt)
+        purchase_orders = result.scalars().all()
+
         return purchase_orders
 
     except Exception as err:

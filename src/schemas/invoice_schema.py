@@ -13,7 +13,7 @@ class InvoiceItemsBase(BaseModel):
 class InvoiceRequest(BaseModel):
     invoice_id: str = Field(..., min_length=1, max_length=50)
     vendor: VendorBase
-    po_id: str = Field(..., min_length=1)
+    po_id: Optional[str] = Field(None)
     invoice_date: date
     due_date: date
     invoice_items: List[InvoiceItemsBase] = Field(..., min_items=1)

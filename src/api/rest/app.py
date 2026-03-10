@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from src.api.rest.routes.history_router import history_router
 from src.api.rest.routes.docs_router import docs_router
 from src.api.rest.routes.extract_router import extract_router
 from src.api.rest.routes.upload_router import upload_router
@@ -11,6 +12,7 @@ app_router.include_router(health_router)
 app_router.include_router(upload_router)
 app_router.include_router(extract_router)
 app_router.include_router(docs_router)
+app_router.include_router(history_router)
 
 @app_router.on_event("startup")
 async def on_start():
