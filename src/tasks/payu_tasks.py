@@ -49,7 +49,7 @@ async def _async_execute(task_type: str, file_id: str, data: dict):
 
             elif task_type == "extract_po":
                 result = await extract_text_from_document(
-                    data["file_bytes"], data["filename"], "purchase order"
+                    data["file_bytes"], data["filename"], "purchase_order"
                 )
                 set_job_status(file_id, "completed", result=result)
 

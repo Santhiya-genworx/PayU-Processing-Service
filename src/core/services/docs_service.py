@@ -1,6 +1,7 @@
 from fastapi import Depends, HTTPException
 from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from src.data.models.user_model import Role
 from src.core.security.jwt_handler import get_current_user
 from src.data.models.vendor_model import Vendor
 from src.data.models.invoice_model import Invoice
@@ -44,12 +45,14 @@ async def getRejectedDocuments(db: AsyncSession):
     except Exception as err:
         raise HTTPException(status_code=500, detail=str(err))
     
-async def getRecentActivity(db: AsyncSession, user = Depends(get_current_user)):
+async def getRecentActivity(db: AsyncSession, user):
     try:
         invoices = await get_data_by_any(Invoice, db, limit=5, order_by=Invoice.updated_at.desc())
         purchase_orders = await get_data_by_any(PurchaseOrder, db, limit=5, order_by=PurchaseOrder.updated_at.desc())
-
-        activity = invoices + purchase_orders if user.role=="admin" else invoices
+        if user["role"]==Role.admin:
+            activity = invoices + purchase_orders 
+        else:
+            activity = invoices
         activity.sort(key=lambda x: x.updated_at, reverse=True)
         top_activity = activity[:5]
         return top_activity
