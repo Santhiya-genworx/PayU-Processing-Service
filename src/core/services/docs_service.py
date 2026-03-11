@@ -49,6 +49,7 @@ async def getRecentActivity(db: AsyncSession, user):
     try:
         invoices = await get_data_by_any(Invoice, db, limit=5, order_by=Invoice.updated_at.desc())
         purchase_orders = await get_data_by_any(PurchaseOrder, db, limit=5, order_by=PurchaseOrder.updated_at.desc())
+        
         if user["role"]==Role.admin:
             activity = invoices + purchase_orders 
         else:
