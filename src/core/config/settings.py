@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     redis_port: int
     redis_db: int
 
+
+    access_secret_key: str
+    access_token_expire_minutes: int
+    refresh_secret_key: str
+    refresh_token_expire_days: int
+    algorithm: str
+
     class Config:
         env_file=".env"
 

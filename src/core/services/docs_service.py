@@ -1,8 +1,7 @@
-from typing import Optional
-
-from fastapi import HTTPException
+from fastapi import Depends, HTTPException
 from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from src.core.security.jwt_handler import get_current_user
 from src.data.models.vendor_model import Vendor
 from src.data.models.invoice_model import Invoice
 from src.data.models.purchase_order_model import PurchaseOrder
@@ -14,6 +13,7 @@ async def getTotalDocuments(db: AsyncSession):
         invoice_docs = await get_data_by_any(Invoice, db)
         po_docs = await get_data_by_any(PurchaseOrder, db)
         return len(invoice_docs) + len(po_docs)
+    
     except Exception as err:
         raise HTTPException(status_code=500, detail=str(err))
     
@@ -22,6 +22,7 @@ async def getApprovedDocuments(db: AsyncSession):
         data = {"status": "approved"}
         invoice_docs = await get_data_by_any(Invoice, db, **data)
         return len(invoice_docs)
+    
     except Exception as err:
         raise HTTPException(status_code=500, detail=str(err))
     
@@ -30,6 +31,7 @@ async def getReviewedDocuments(db: AsyncSession):
         data = {"status": "reviewed"}
         invoice_docs = await get_data_by_any(Invoice, db, **data)
         return len(invoice_docs)
+    
     except Exception as err:
         raise HTTPException(status_code=500, detail=str(err))
     
@@ -38,15 +40,16 @@ async def getRejectedDocuments(db: AsyncSession):
         data = {"status": "rejected"}
         invoice_docs = await get_data_by_any(Invoice, db, **data)
         return len(invoice_docs)
+    
     except Exception as err:
         raise HTTPException(status_code=500, detail=str(err))
     
-async def getRecentActivity(db: AsyncSession):
+async def getRecentActivity(db: AsyncSession, user = Depends(get_current_user)):
     try:
         invoices = await get_data_by_any(Invoice, db, limit=5, order_by=Invoice.updated_at.desc())
         purchase_orders = await get_data_by_any(PurchaseOrder, db, limit=5, order_by=PurchaseOrder.updated_at.desc())
 
-        activity = invoices + purchase_orders
+        activity = invoices + purchase_orders if user.role=="admin" else invoices
         activity.sort(key=lambda x: x.updated_at, reverse=True)
         top_activity = activity[:5]
         return top_activity
@@ -69,7 +72,6 @@ async def filterInvoices(search: str, db: AsyncSession):
 
         result = await db.execute(stmt)
         invoices = result.scalars().all()
-        print(invoices, search)
         return invoices
 
     except Exception as err:

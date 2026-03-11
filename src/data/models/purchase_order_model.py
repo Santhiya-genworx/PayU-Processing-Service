@@ -24,7 +24,6 @@ class PurchaseOrder(Base):
 
     vendor = relationship("Vendor", back_populates="purchase_orders")
     order_items = relationship("OrderedItems", back_populates="purchase_order")
-    invoice = relationship("Invoice", back_populates="purchase_order")
     history = relationship("PurchaseOrderUploadHistory", back_populates="purchase_order")
 
 class OrderedItems(Base):

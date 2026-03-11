@@ -1,9 +1,7 @@
 import uuid
 from fastapi import APIRouter, File, UploadFile
-from src.utils.file_upload import upload
 from src.utils.job_status import set_job_status, get_job_status
 from src.data.clients.redis import extract_queue
-from fastapi import HTTPException
 
 extract_router = APIRouter(prefix="/extract")
 
@@ -13,7 +11,6 @@ async def extract_data_from_invoice(file: UploadFile = File(...)):
     file_bytes = await file.read()
     filename = file.filename or "upload"
 
-    # Mark as processing BEFORE enqueue so first poll never gets 404
     set_job_status(file_id, "processing")
 
     extract_queue.enqueue(
@@ -28,14 +25,12 @@ async def extract_data_from_invoice(file: UploadFile = File(...)):
     )
     return {"status": "processing", "file_id": file_id}
 
-
 @extract_router.post("/purchase-order")
 async def extract_data_from_po(file: UploadFile = File(...)):
     file_id = str(uuid.uuid4())
     file_bytes = await file.read()
     filename = file.filename or "upload"
 
-    # Mark as processing BEFORE enqueue so first poll never gets 404
     set_job_status(file_id, "processing")
 
     extract_queue.enqueue(
@@ -50,11 +45,9 @@ async def extract_data_from_po(file: UploadFile = File(...)):
     )
     return {"status": "processing", "file_id": file_id}
 
-
 @extract_router.get("/status/{file_id}")
 async def get_extraction_status(file_id: str):
     job = get_job_status(file_id)
     if job is None:
-        # Treat as still processing — worker may not have started yet
         return {"status": "processing"}
     return job

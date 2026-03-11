@@ -8,5 +8,6 @@ class AgentState(TypedDict, total=False):
     base64_image: str
     confidence_score: float
     document_type: str
+    detected_document_type: str
     invoice_data: InvoiceRequest
     po_data: PurchaseOrderRequest

@@ -31,7 +31,7 @@ class VendorBase(BaseModel):
             raise ValueError("Invalid IFSC code format")
         return v.upper()
 
-    # Account Number Check
+    # Account Number Validation
     @field_validator("account_number")
     @classmethod
     def validate_account_number(cls, v):
