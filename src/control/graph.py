@@ -40,7 +40,7 @@ async def invoke_graph(input: str, file_type: str, document_type: str):
         result = await graph.ainvoke(state)
         if document_type == "invoice":
             return result.get("invoice_data")
-        elif document_type == "purchase order":
+        elif document_type == "purchase_order":
             return result.get("po_data")
         else:
             raise HTTPException(status_code=400, detail="Invalid document type")
