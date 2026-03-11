@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, UploadFile
+from fastapi import Depends, HTTPException
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.api.rest.dependencies import get_db

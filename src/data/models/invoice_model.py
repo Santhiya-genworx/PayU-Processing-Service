@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Date, DateTime, Enum, ForeignKey, Integer, Numeric, String, func
+from sqlalchemy import Boolean, Column, Date, DateTime, Enum, ForeignKey, Integer, Numeric, String, func
 from sqlalchemy.orm import relationship
 from src.data.clients.database import Base
 from enum import Enum as PyEnum
@@ -15,7 +15,8 @@ class Invoice(Base):
 
     invoice_id = Column(String(255), primary_key=True)
     vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=False)
-    po_id = Column(String(255),ForeignKey("purchase_orders.po_id"), nullable=True)
+    po_id = Column(String(255), nullable=True)
+    is_po_matched = Column(Boolean, default=False)
     invoice_date = Column(Date, nullable=False)
     due_date = Column(Date, nullable=False)
     currency_code = Column(String(3), nullable=False)
@@ -29,7 +30,6 @@ class Invoice(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     vendor = relationship("Vendor", back_populates="invoices")
-    purchase_order = relationship("PurchaseOrder", back_populates="invoice")
     invoice_items =  relationship("InvoiceItem", back_populates="invoice")
     history = relationship("InvoiceUploadHistory", back_populates="invoice")
 
