@@ -55,6 +55,7 @@ async def getRecentActivity(db: AsyncSession, user):
         else:
             activity = invoices
         activity.sort(key=lambda x: x.updated_at, reverse=True)
+        
         top_activity = activity[:5]
         return top_activity
 
