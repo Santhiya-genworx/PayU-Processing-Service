@@ -7,7 +7,6 @@ from src.schemas.purchase_order_schema import PurchaseOrderRequest
 from src.api.rest.dependencies import AsyncSessionLocal
 from src.utils.job_status import set_job_status
 
-
 def execute_task(data: dict):
     task_type = data.get("task_type")
     file_id = data.get("file_id")
@@ -50,7 +49,7 @@ async def _async_execute(task_type: str, file_id: str, data: dict):
 
             elif task_type == "extract_po":
                 result = await extract_text_from_document(
-                    data["file_bytes"], data["filename"], "purchase order"
+                    data["file_bytes"], data["filename"], "purchase_order"
                 )
                 set_job_status(file_id, "completed", result=result)
 

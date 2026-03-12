@@ -37,8 +37,9 @@ async def uploadInvoice(invoice: InvoiceRequest, file_url: str, db: AsyncSession
             pos = await get_data_by_any(PurchaseOrder, db, po_id=invoice.po_id)
             po = pos[0] if pos else None
 
-            if po and po.vendor_id != vendor.id:
-                raise HTTPException(status_code=400, detail="PO does not belong to given vendor")
+            if po:
+                if po.vendor_id != vendor.id:
+                    raise HTTPException(status_code=400, detail="PO does not belong to given vendor")
 
         try:
             invoices = await get_data_by_any(Invoice, db, invoice_id=invoice.invoice_id)
@@ -54,6 +55,7 @@ async def uploadInvoice(invoice: InvoiceRequest, file_url: str, db: AsyncSession
             "invoice_id": invoice.invoice_id,
             "vendor_id": vendor.id,
             "po_id": invoice.po_id,
+            "is_po_matched": po is not None,
             "invoice_date": invoice.invoice_date,
             "due_date": invoice.due_date,
             "currency_code": invoice.currency_code,
