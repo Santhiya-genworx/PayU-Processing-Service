@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 import re
 
 class VendorBase(BaseModel):
@@ -38,3 +38,5 @@ class VendorBase(BaseModel):
         if not v.isdigit():
             raise ValueError("Account number must contain only digits")
         return v
+    
+    model_config = ConfigDict(from_attributes=True)

@@ -6,8 +6,10 @@ class Settings(BaseSettings):
     db_host:str
     db_password:str
     db_port: int
+    db_url:str
 
     gemini_api_key: str
+    groq_api_key: str
 
     cloudinary_cloud_name: str
     cloudinary_api_key: str
@@ -16,13 +18,19 @@ class Settings(BaseSettings):
     redis_host: str
     redis_port: int
     redis_db: int
-
+    redis_url: str
 
     access_secret_key: str
     access_token_expire_minutes: int
     refresh_secret_key: str
     refresh_token_expire_days: int
     algorithm: str
+
+    mail_username: str
+    mail_password: str
+    mail_port: int
+    mail_from: str
+    mail_server: str
 
     class Config:
         env_file=".env"

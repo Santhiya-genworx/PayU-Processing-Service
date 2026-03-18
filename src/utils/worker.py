@@ -1,27 +1,18 @@
-import multiprocessing
+import os
 from rq import Worker
-from src.data.clients.redis import redis_connection
+from src.data.clients.redis import redis_connection, extract_queue, upload_queue, match_queue
 
-QUEUES_AND_WORKERS = [
-    (["extract_queue"], 3),   # 3 workers for extraction 
-    (["upload_queue"],  2),   # 2 workers for uploads
-]
+print("🚀 worker.py starting...")
 
-def start_worker(queues: list[str]):
-    worker = Worker(queues, connection=redis_connection)
-    worker.work()
+try:
+    pong = redis_connection.ping()
+    print(f"✅ Redis connected — ping: {pong}")
+except Exception as e:
+    print(f"🔥 Redis connection FAILED: {e}")
+    raise
 
-if __name__ == "__main__":
-    processes = []
-
-    for queues, count in QUEUES_AND_WORKERS:
-        for _ in range(count):
-            p = multiprocessing.Process(target=start_worker, args=(queues,))
-            p.start()
-            processes.append(p)
-            print(f"Started worker for queues: {queues}")
-
-    print(f"Total workers running: {len(processes)}")
-
-    for p in processes:
-        p.join() 
+queues = [extract_queue, upload_queue, match_queue]
+print(f"✅ Starting worker for queues: {[q.name for q in queues]}")
+worker = Worker(queues, connection=redis_connection)
+print("✅ worker created, starting work loop...")
+worker.work(with_scheduler=False)
