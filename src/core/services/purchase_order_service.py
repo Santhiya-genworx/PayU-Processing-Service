@@ -1,6 +1,7 @@
 from fastapi import Depends, HTTPException
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
+from src.core.services.matching_service import matchPo
 from src.api.rest.dependencies import get_db
 from src.data.models.purchase_order_model import OrderedItems, PurchaseOrder
 from src.data.models.upload_history_model import PurchaseOrderUploadHistory
@@ -61,6 +62,7 @@ async def uploadPurchaseOrder(po: PurchaseOrderRequest, file_url: str, db: Async
             }
             await insert_data(OrderedItems, db, **item_data)
         await commit_transaction(db)
+        await matchPo(po.po_id, db)
 
         return {"message": f"Purchase Order {po.po_id} uploaded successfully"}
 
@@ -117,6 +119,7 @@ async def overridePurchaseOrder(po: PurchaseOrderRequest, file_url: str, db: Asy
         }
         await insert_data(PurchaseOrderUploadHistory, db, **history_data)
         await commit_transaction(db)
+        await matchPo(po.po_id, db)
 
         return {"message": f"Purchase Order {po.po_id} overridden successfully"}
 
@@ -127,3 +130,4 @@ async def overridePurchaseOrder(po: PurchaseOrderRequest, file_url: str, db: Asy
     except Exception as err:
         await db.rollback()
         raise
+

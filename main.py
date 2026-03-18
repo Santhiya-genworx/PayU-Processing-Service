@@ -12,7 +12,7 @@ app.include_router(app_router)
 app.add_middleware(AuthMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://localhost:8000"],
+    allow_origins=["https://payu-frontend-717740758627.us-east1.run.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"], 

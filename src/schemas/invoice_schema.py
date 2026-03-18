@@ -1,14 +1,17 @@
 from enum import Enum
 from typing import List, Optional
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from datetime import date
 from src.schemas.vendor_schema import VendorBase
 
 class InvoiceItemsBase(BaseModel):
     item_description: str = Field(..., min_length=1, max_length=255)
-    quantity: int = Field(..., gt=0)
-    unit_price: float = Field(..., gt=0)
+    quantity: Optional[int] = Field(None, gt=0)
+    unit_price: Optional[float] = Field(None, gt=0)
     total_price: float = Field(..., gt=0)
+    
+    model_config = ConfigDict(from_attributes=True)
+
 
 class InvoiceRequest(BaseModel):
     invoice_id: str = Field(..., min_length=1, max_length=50)
@@ -28,12 +31,33 @@ class InvoiceRequest(BaseModel):
         if self.due_date < self.invoice_date:
             raise ValueError("Due date cannot be before invoice date")
 
-        calculated_subtotal = sum(item.quantity * item.unit_price for item in self.invoice_items)
-        if round(calculated_subtotal, 2) != round(self.subtotal, 2):
-            raise ValueError("Subtotal mismatch with invoice items")
+        # Validate subtotal only if all item values exist
+        calculated_subtotal = 0
+        subtotal_check_possible = True
 
-        expected_total = self.subtotal + self.tax_amount - (self.discount_amount or 0)
-        if round(expected_total, 2) != round(self.total_amount, 2):
-            raise ValueError("Total amount calculation mismatch")
+        for item in self.invoice_items:
+            if item.quantity is None or item.unit_price is None:
+                subtotal_check_possible = False
+                break
+            calculated_subtotal += item.quantity * item.unit_price
+
+        if subtotal_check_possible:
+            if round(calculated_subtotal, 2) != round(self.subtotal, 2):
+                raise ValueError("Subtotal mismatch with invoice items")
+
+        # Validate total only if required values exist
+        if self.subtotal is not None and self.tax_amount is not None:
+            expected_total = self.subtotal + self.tax_amount - (self.discount_amount or 0)
+
+            if round(expected_total, 2) != round(self.total_amount, 2):
+                raise ValueError("Total amount calculation mismatch")
 
         return self
+
+    model_config = ConfigDict(from_attributes=True)
+
+class InvoiceAction(BaseModel):
+    invoice_id: str
+    mail_to: Optional[str] = None
+    mail_subject: Optional[str] = None
+    mail_body: Optional[str] = None

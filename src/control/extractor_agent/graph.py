@@ -1,8 +1,8 @@
 from fastapi import HTTPException
 from langgraph.graph import END, START, StateGraph
-from src.control.router import router
-from src.control.agents.extractor_agent import detect_document_type, text_extractor, vision_extractor
-from src.control.state import AgentState
+from src.control.extractor_agent.router import router
+from src.control.extractor_agent.agents.agents import detect_document_type, text_extractor, vision_extractor
+from src.control.extractor_agent.state import AgentState
 
 workflow = StateGraph(AgentState)
 

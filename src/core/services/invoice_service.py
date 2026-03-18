@@ -1,14 +1,16 @@
-from fastapi import Depends, HTTPException, UploadFile
+import uuid
+from fastapi import Depends, HTTPException
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
+from src.core.services.email_service import send_email
 from src.api.rest.dependencies import get_db
-from src.data.models.invoice_model import Invoice, InvoiceItem
+from src.data.models.invoice_model import Decision, Invoice, InvoiceItem
 from src.data.models.purchase_order_model import PurchaseOrder
 from src.data.models.upload_history_model import InvoiceUploadHistory
 from src.data.models.vendor_model import Vendor
 from src.data.repositories.base_repository import commit_transaction, delete_data_by_any, get_data_by_any, insert_data, update_data_by_any
-from src.schemas.invoice_schema import InvoiceRequest
-from src.utils.file_upload import upload
+from src.schemas.invoice_schema import InvoiceAction, InvoiceRequest
+from src.data.clients.redis import match_queue
 
 async def uploadInvoice(invoice: InvoiceRequest, file_url: str, db: AsyncSession = Depends(get_db)):
     try:
@@ -67,9 +69,10 @@ async def uploadInvoice(invoice: InvoiceRequest, file_url: str, db: AsyncSession
             "file_url": file_url
         }
         await insert_data(Invoice, db, **data)
+        await commit_transaction(db)
 
-        inserted_invoice = await get_data_by_any(Invoice, db, invoice_id=invoice.invoice_id)
-        inserted_invoice = inserted_invoice[0]
+        inserted_invoices = await get_data_by_any(Invoice, db, invoice_id=invoice.invoice_id)
+        inserted_invoice = inserted_invoices[0] if inserted_invoices else None
         for item in invoice.invoice_items:
             data = {
                 "invoice_id": inserted_invoice.invoice_id,
@@ -81,6 +84,17 @@ async def uploadInvoice(invoice: InvoiceRequest, file_url: str, db: AsyncSession
             await insert_data(InvoiceItem, db, **data)
 
         await commit_transaction(db)
+        if not po or (po and inserted_invoice.is_po_matched):
+            from src.tasks.payu_tasks import execute_task
+            match_queue.enqueue(
+                execute_task,
+                {
+                    "invoice_id": invoice.invoice_id,
+                    "task_type": "validate_invoice",
+                    "type": "new",
+                    "job_id": str(uuid.uuid4())
+                }
+            )
         return {"message": f"Invoice {inserted_invoice.invoice_id} uploaded successfully"}
     
     except SQLAlchemyError as err:
@@ -127,7 +141,6 @@ async def overrideInvoice(invoice: InvoiceRequest, file_url: str, db: AsyncSessi
             "file_url": file_url
         }
         await update_data_by_any(Invoice, db, {"invoice_id": invoice.invoice_id}, **updated_data)
-
         await delete_data_by_any(InvoiceItem, db, invoice_id=existing_invoice.invoice_id)
 
         for item in invoice.invoice_items:
@@ -147,6 +160,17 @@ async def overrideInvoice(invoice: InvoiceRequest, file_url: str, db: AsyncSessi
         }
         await insert_data(InvoiceUploadHistory, db, **history_data)
         await commit_transaction(db)
+        if not po or (po and existing_invoice.is_po_matched):
+            from src.tasks.payu_tasks import execute_task
+            match_queue.enqueue(
+                execute_task,
+                {
+                    "invoice_id": invoice.invoice_id,
+                    "task_type": "validate_invoice",
+                    "type": "override",
+                    "job_id": str(uuid.uuid4())
+                }
+            )
 
         return { "message": f"Invoice {invoice.invoice_id} overridden successfully" }
 
@@ -156,4 +180,68 @@ async def overrideInvoice(invoice: InvoiceRequest, file_url: str, db: AsyncSessi
 
     except Exception as err:
         await db.rollback()
-        raise 
+        raise
+
+async def approveInvoice(data: InvoiceAction, db: AsyncSession):
+    try:
+        invoice_id = data.invoice_id
+        await update_data_by_any(Invoice, db, {"invoice_id": invoice_id}, status="approved")
+        await commit_transaction(db)
+        return {"status": "approved", "invoice_id": invoice_id}
+    
+    except Exception as err:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Invoice {invoice_id} approval failed: {str(err)}")
+
+async def reviewInvoice(data: InvoiceAction, db: AsyncSession):
+    try:
+        invoice_id = data.invoice_id
+        await update_data_by_any(Invoice, db, {"invoice_id": invoice_id}, status="reviewed")
+        updated_mail = {}
+        if data.mail_to:
+            updated_mail["mail_to"] = data.mail_to
+        if data.mail_subject:
+            updated_mail["mail_subject"] = data.mail_subject
+        if data.mail_body:
+            updated_mail["mail_body"] = data.mail_body
+        if updated_mail:
+            await update_data_by_any(Decision, db, {"invoice_id": invoice_id}, **updated_mail)
+        await commit_transaction(db)
+        decisions = await get_data_by_any(Decision, db, invoice_id=invoice_id)
+        decision = decisions[0] if decisions else None
+
+        if decision and decision.mail_to:
+            await send_email(decision.mail_to, decision.mail_subject, decision.mail_body)
+
+        return {"status": "reviewed", "invoice_id": invoice_id}
+    
+    except Exception as err:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Invoice {invoice_id} review failed: {str(err)}")
+
+async def rejectInvoice(data: InvoiceAction, db: AsyncSession):
+    try:
+        invoice_id = data.invoice_id
+        await update_data_by_any(Invoice, db, {"invoice_id": invoice_id}, status="rejected")
+        updated_mail = {}
+        if data.mail_to:
+            updated_mail["mail_to"] = data.mail_to
+        if data.mail_subject:
+            updated_mail["mail_subject"] = data.mail_subject
+        if data.mail_body:
+            updated_mail["mail_body"] = data.mail_body
+        if updated_mail:
+            await update_data_by_any(Decision, db, {"invoice_id": invoice_id}, **updated_mail)
+        await commit_transaction(db)
+
+        decisions = await get_data_by_any(Decision, db, invoice_id=invoice_id)
+        decision = decisions[0] if decisions else None
+
+        if decision and decision.mail_to:
+            await send_email(decision.mail_to, decision.mail_subject, decision.mail_body)
+
+        return {"status": "rejected", "invoice_id": invoice_id}
+    
+    except Exception as err:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Invoice {invoice_id} rejection failed: {str(err)}")

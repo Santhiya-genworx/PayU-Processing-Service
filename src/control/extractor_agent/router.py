@@ -1,4 +1,4 @@
-from src.control.state import AgentState
+from src.control.extractor_agent.state import AgentState
 
 def router(state: AgentState):
     print("Router...")

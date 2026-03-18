@@ -1,5 +1,5 @@
 from typing import List
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from datetime import date
 from src.schemas.vendor_schema import VendorBase
 
@@ -8,6 +8,9 @@ class OrderedItemsBase(BaseModel):
     quantity: int = Field(..., gt=0)
     unit_price: float = Field(..., gt=0)
     total_price: float = Field(..., gt=0)
+
+    model_config = ConfigDict(from_attributes=True)
+
 
 class PurchaseOrderRequest(BaseModel):
     po_id: str = Field(..., min_length=1, max_length=50)
@@ -23,3 +26,5 @@ class PurchaseOrderRequest(BaseModel):
         if self.total_amount <= 0:
             raise ValueError("PO total amount must be greater than zero")
         return self
+    
+    model_config = ConfigDict(from_attributes=True)
