@@ -29,7 +29,6 @@ async def extract_data_from_invoice(file: UploadFile = File(...)):
     print({ "extract_queue_count": extract_queue.count })
     return {"status": "processing", "file_id": file_id}
 
-
 @extract_router.post("/purchase-order")
 async def extract_data_from_po(file: UploadFile = File(...)):
     file_id = str(uuid.uuid4())
@@ -50,7 +49,6 @@ async def extract_data_from_po(file: UploadFile = File(...)):
     )
     print(t.__dict__)
     return {"status": "processing", "file_id": file_id}
-
 
 @extract_router.get("/status/{file_id}")
 async def get_extraction_status(file_id: str):

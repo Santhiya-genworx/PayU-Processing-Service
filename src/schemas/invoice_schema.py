@@ -12,7 +12,6 @@ class InvoiceItemsBase(BaseModel):
     
     model_config = ConfigDict(from_attributes=True)
 
-
 class InvoiceRequest(BaseModel):
     invoice_id: str = Field(..., min_length=1, max_length=50)
     vendor: VendorBase
@@ -31,7 +30,6 @@ class InvoiceRequest(BaseModel):
         if self.due_date < self.invoice_date:
             raise ValueError("Due date cannot be before invoice date")
 
-        # Validate subtotal only if all item values exist
         calculated_subtotal = 0
         subtotal_check_possible = True
 
@@ -45,7 +43,6 @@ class InvoiceRequest(BaseModel):
             if round(calculated_subtotal, 2) != round(self.subtotal, 2):
                 raise ValueError("Subtotal mismatch with invoice items")
 
-        # Validate total only if required values exist
         if self.subtotal is not None and self.tax_amount is not None:
             expected_total = self.subtotal + self.tax_amount - (self.discount_amount or 0)
 

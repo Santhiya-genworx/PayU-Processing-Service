@@ -16,29 +16,24 @@ class AuthMiddleware(BaseHTTPMiddleware):
             "/users/create"
         ]
 
-        # ✅ Allow public routes
         if request.url.path in public_urls:
             return await call_next(request)
 
         token = None
 
-        # ✅ 1. Check Authorization header FIRST
         auth_header = request.headers.get("Authorization")
         if auth_header and auth_header.startswith("Bearer "):
             token = auth_header.split(" ")[1]
 
-        # ✅ 2. If not in header, check cookies
         if not token:
             token = request.cookies.get("access_token")
 
-        # ❌ If still no token → reject
         if not token:
             return JSONResponse(
                 status_code=401,
                 content={"detail": "Authentication token missing"}
             )
 
-        # ✅ Decode safely
         try:
             payload = jwt.decode(
                 token,

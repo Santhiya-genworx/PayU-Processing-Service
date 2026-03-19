@@ -44,9 +44,8 @@ def price_check_node(state: AgentState):
     messages = []
 
     for item in invoice.invoice_items:
-        # Service items: only total_price matters, skip calculation check silently
         if item.quantity is None or item.unit_price is None:
-            continue  # ← was appending a message here, now silent
+            continue  
 
         expected = round(item.quantity * item.unit_price, 2)
 
@@ -102,7 +101,7 @@ def quantity_price_match_node(state: AgentState):
                                 f"PO={po_item.unit_price}, Invoice={inv_item.unit_price}"
                     ))
 
-        # Total price check always applies (service or not)
+        # Total price check
         if po and inv_item.total_price is not None and po_item.total_price is not None:
             if round(inv_item.total_price, 2) != round(po_item.total_price, 2):
                 messages.append(AIMessage(
