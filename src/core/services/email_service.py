@@ -1,5 +1,3 @@
-# email.py — replace send_email_sync wrapper
-import asyncio
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
 from src.core.config.settings import settings
 
@@ -18,7 +16,6 @@ conf = ConnectionConfig(
 fm = FastMail(conf)
 
 async def send_email(to: str, subject: str, message: str) -> bool:
-
     email_message = MessageSchema(
         subject=subject,
         recipients=[to],
