@@ -23,7 +23,7 @@ class PurchaseOrder(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     vendor = relationship("Vendor", back_populates="purchase_orders")
-    order_items = relationship("OrderedItems", back_populates="purchase_order")
+    ordered_items = relationship("OrderedItems", back_populates="purchase_order")
     history = relationship("PurchaseOrderUploadHistory", back_populates="purchase_order")
 
 class OrderedItems(Base):
@@ -37,4 +37,4 @@ class OrderedItems(Base):
     total_price = Column(Numeric(15,2), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    purchase_order = relationship("PurchaseOrder", back_populates="order_items")
+    purchase_order = relationship("PurchaseOrder", back_populates="ordered_items")

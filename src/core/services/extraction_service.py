@@ -2,7 +2,8 @@ import base64
 import io
 import os
 import fitz
-from src.control.graph import invoke_graph
+from src.control.extractor_agent.graph import invoke_graph
+from src.utils.file_upload import download_from_gcs
 
 def detect_file_type(filename: str) -> str:
     extension = os.path.splitext(filename)[1].lower()
@@ -12,7 +13,6 @@ def detect_file_type(filename: str) -> str:
         return "image"
     else:
         return "unsupported"
-
 
 async def extract_pdf(file_bytes: bytes) -> str:
     try:
@@ -29,16 +29,16 @@ async def extract_pdf(file_bytes: bytes) -> str:
     except Exception as e:
         raise Exception(f"PDF extraction failed: {str(e)}")
 
-
 async def extract_image(file_bytes: bytes) -> str:
     try:
         return base64.b64encode(file_bytes).decode("utf-8")
     except Exception as e:
         raise Exception(f"Image processing failed: {str(e)}")
 
-
-async def extract_text_from_document(file_bytes: bytes, filename: str, document_type: str):
+async def extract_text_from_document(gcs_path: str, filename: str, document_type: str):
     try:
+        file_bytes = download_from_gcs(gcs_path)   
+
         file_type = detect_file_type(filename)
         if file_type == "unsupported":
             raise Exception(f"Unsupported file type for: {filename}")
@@ -50,11 +50,9 @@ async def extract_text_from_document(file_bytes: bytes, filename: str, document_
         else:
             raise Exception(f"Unsupported file type: {file_type}")
 
-        try:
-            result =  await invoke_graph(raw_text, file_type, document_type)
-            return result
-        except Exception as e:
-            raise
+        result = await invoke_graph(raw_text, file_type, document_type)
+        print("result", result)
+        return result
 
     except Exception:
         raise
