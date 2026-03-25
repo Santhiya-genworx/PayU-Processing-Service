@@ -1,40 +1,66 @@
-from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, Numeric, String, func, Enum
-from sqlalchemy.orm import relationship
-from src.data.clients.database import Base
+from __future__ import annotations
+
+from datetime import date, datetime
 from enum import Enum as PyEnum
+
+from sqlalchemy import Date, DateTime, Enum, ForeignKey, Integer, Numeric, String, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from src.data.clients.database import Base
+from src.data.models.vendor_model import Vendor
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.data.models.upload_history_model import PurchaseOrderUploadHistory
 
 class POStatus(PyEnum):
     pending = "pending"
     completed = "completed"
     cancelled = "cancelled"
 
+
 class PurchaseOrder(Base):
     __tablename__ = "purchase_orders"
 
-    po_id = Column(String(255), primary_key=True)
-    vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=False)
-    gl_code = Column(String(255), nullable=False)
-    total_amount = Column(Numeric(15,2), nullable=False)
-    currency_code = Column(String(3), nullable=False)
-    ordered_date = Column(Date, nullable=False)
-    file_url = Column(String(255), nullable=False)
-    status = Column(Enum(POStatus), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    po_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    vendor_id: Mapped[int] = mapped_column(ForeignKey("vendors.id"))
 
-    vendor = relationship("Vendor", back_populates="purchase_orders")
-    ordered_items = relationship("OrderedItems", back_populates="purchase_order")
-    history = relationship("PurchaseOrderUploadHistory", back_populates="purchase_order")
+    gl_code: Mapped[str] = mapped_column(String(255))
+    total_amount: Mapped[float] = mapped_column(Numeric(15, 2))
+    currency_code: Mapped[str] = mapped_column(String(3))
+    ordered_date: Mapped[date] = mapped_column(Date)
+    file_url: Mapped[str] = mapped_column(String(255))
+
+    status: Mapped[POStatus] = mapped_column(Enum(POStatus, name="po_status_enum"))
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    vendor: Mapped[Vendor] = relationship(back_populates="purchase_orders")
+
+    ordered_items: Mapped[list[OrderedItems]] = relationship(
+        back_populates="purchase_order", cascade="all, delete-orphan"
+    )
+
+    history: Mapped[list[PurchaseOrderUploadHistory]] = relationship(
+        back_populates="purchase_order"
+    )
+
 
 class OrderedItems(Base):
     __tablename__ = "ordered_items"
 
-    item_id = Column(Integer, primary_key=True, autoincrement=True)
-    po_id = Column(String(255), ForeignKey("purchase_orders.po_id"), nullable=False)
-    item_description = Column(String(255), nullable=False)
-    quantity = Column(Integer, nullable=False)
-    unit_price = Column(Numeric(15,2), nullable=False)
-    total_price = Column(Numeric(15,2), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    item_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
-    purchase_order = relationship("PurchaseOrder", back_populates="ordered_items")
+    po_id: Mapped[str] = mapped_column(ForeignKey("purchase_orders.po_id"), nullable=False)
+
+    item_description: Mapped[str] = mapped_column(String(255))
+    quantity: Mapped[int] = mapped_column(Integer)
+    unit_price: Mapped[float] = mapped_column(Numeric(15, 2))
+    total_price: Mapped[float] = mapped_column(Numeric(15, 2))
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    purchase_order: Mapped[PurchaseOrder] = relationship(back_populates="ordered_items")
