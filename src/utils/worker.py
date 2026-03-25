@@ -1,17 +1,24 @@
 from rq import Worker
-from src.data.clients.redis import redis_connection, extract_queue, upload_queue, match_queue
 
-print("worker starting...")
+from src.data.clients.redis import (
+    extract_queue,
+    match_queue,
+    redis_connection,
+    upload_queue,
+)
+from src.observability.logging.logging_config import logger
+
+logger.info("worker starting...")
 
 try:
     pong = redis_connection.ping()
-    print(f"Redis connected — ping: {pong}")
+    logger.info(f"Redis connected — ping: {pong}")
 except Exception as e:
-    print(f"Redis connection FAILED: {e}")
+    logger.error(f"Redis connection FAILED: {e}")
     raise
 
 queues = [extract_queue, upload_queue, match_queue]
-print(f"Starting worker for queues: {[q.name for q in queues]}")
+logger.info(f"Starting worker for queues: {[q.name for q in queues]}")
 worker = Worker(queues, connection=redis_connection)
-print("worker created, starting work loop...")
+logger.info("worker created, starting work loop...")
 worker.work(with_scheduler=False)
