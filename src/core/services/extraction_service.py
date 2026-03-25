@@ -1,9 +1,13 @@
 import base64
 import io
 import os
+from typing import Any
+
 import fitz
-from src.control.extractor_agent.graph import invoke_graph
-from src.utils.file_upload import download_from_gcs
+from src.control.extractor_agent.extractor_graph import invoke_graph
+
+from src.utils.file_upload import download_from_cloudinary
+
 
 def detect_file_type(filename: str) -> str:
     extension = os.path.splitext(filename)[1].lower()
@@ -13,6 +17,7 @@ def detect_file_type(filename: str) -> str:
         return "image"
     else:
         return "unsupported"
+
 
 async def extract_pdf(file_bytes: bytes) -> str:
     try:
@@ -26,23 +31,31 @@ async def extract_pdf(file_bytes: bytes) -> str:
             raise ValueError("PDF has no extractable text")
 
         return text
-    except Exception as e:
-        raise Exception(f"PDF extraction failed: {str(e)}")
+    except Exception as err:
+        raise Exception(f"PDF extraction failed: {str(err)}") from err
+
 
 async def extract_image(file_bytes: bytes) -> str:
     try:
         return base64.b64encode(file_bytes).decode("utf-8")
-    except Exception as e:
-        raise Exception(f"Image processing failed: {str(e)}")
+    except Exception as err:
+        raise Exception(f"Image processing failed: {str(err)}") from err
 
-async def extract_text_from_document(gcs_path: str, filename: str, document_type: str):
+
+async def extract_text_from_document(
+    gcs_path: str,
+    filename: str,
+    document_type: str,
+) -> dict[str, Any]:
     try:
-        file_bytes = download_from_gcs(gcs_path)   
+        file_bytes: bytes = download_from_cloudinary(gcs_path)
 
-        file_type = detect_file_type(filename)
+        file_type: str = detect_file_type(filename)
+
         if file_type == "unsupported":
             raise Exception(f"Unsupported file type for: {filename}")
 
+        raw_text: str = ""
         if file_type == "pdf":
             raw_text = await extract_pdf(file_bytes)
         elif file_type == "image":
@@ -50,8 +63,8 @@ async def extract_text_from_document(gcs_path: str, filename: str, document_type
         else:
             raise Exception(f"Unsupported file type: {file_type}")
 
-        result = await invoke_graph(raw_text, file_type, document_type)
-        print("result", result)
+        result: dict[str, Any] = await invoke_graph(raw_text, file_type, document_type)
+
         return result
 
     except Exception:

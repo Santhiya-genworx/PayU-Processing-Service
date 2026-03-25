@@ -1,12 +1,15 @@
-from pydantic_settings import BaseSettings
+from __future__ import annotations
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Settings(BaseSettings):
-    db_user:str
-    db_name:str
-    db_host:str
-    db_password:str
+    db_user: str
+    db_name: str
+    db_host: str
+    db_password: str
     db_port: int
-    db_url:str
+    db_url: str
 
     gemini_api_key: str
     groq_api_key: str
@@ -32,7 +35,7 @@ class Settings(BaseSettings):
     mail_from: str
     mail_server: str
 
-    class Config:
-        env_file=".env"
+    model_config = SettingsConfigDict(env_file=".env")
 
-settings=Settings()
+
+settings = Settings()  # type: ignore
