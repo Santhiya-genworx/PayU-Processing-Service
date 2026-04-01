@@ -6,7 +6,7 @@ from typing import Any
 import fitz
 from src.control.extractor_agent.extractor_graph import invoke_graph
 
-from src.utils.file_upload import download_from_cloudinary
+from src.utils.file_upload import download_from_gcs
 
 
 def detect_file_type(filename: str) -> str:
@@ -48,7 +48,7 @@ async def extract_text_from_document(
     document_type: str,
 ) -> dict[str, Any]:
     try:
-        file_bytes: bytes = download_from_cloudinary(gcs_path)
+        file_bytes: bytes = download_from_gcs(gcs_path)
 
         file_type: str = detect_file_type(filename)
 
