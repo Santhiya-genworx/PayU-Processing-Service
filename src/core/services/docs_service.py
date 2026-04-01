@@ -323,6 +323,9 @@ async def getInvoiceMatchings(db: AsyncSession, search: str | None = None) -> li
                     "confidence_score": m.confidence_score,
                     "is_po_matched": m.is_po_matched,
                     "command": m.command,
+                    "mail_to": m.mail_to,
+                    "mail_subject": m.mail_subject,
+                    "mail_body": m.mail_body,
                     "vendor": {
                         "name": inv.vendor.name if inv.vendor else None,
                         "email": inv.vendor.email if inv.vendor else None,
@@ -340,6 +343,8 @@ async def getInvoiceMatchings(db: AsyncSession, search: str | None = None) -> li
                         }
                         for item in (inv.invoice_items or [])
                     ],
+                    "subtotal": inv.subtotal,
+                    "tax_amount": inv.tax_amount
                 }
             )
         return response

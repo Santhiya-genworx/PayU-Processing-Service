@@ -25,8 +25,10 @@ REDIS_PORT=6379
 REDIS_DB=0
 REDIS_URL="redis://$REDIS_HOST:$REDIS_PORT/$REDIS_DB"
 
+ORIGINS=https://payu-frontend-717740758627.us-east1.run.app
+
 # === Shared env vars ===
-SHARED_ENV="DB_URL=$DB_URL,DB_HOST=$DB_HOST,DB_USER=$DB_USER,DB_PASSWORD=$DB_PASS,DB_NAME=$DB_NAME,DB_PORT=$DB_PORT,REDIS_HOST=$REDIS_HOST,REDIS_PORT=$REDIS_PORT,REDIS_DB=$REDIS_DB,REDIS_URL=$REDIS_URL,PYTHONUNBUFFERED=1"
+SHARED_ENV="DB_URL=$DB_URL,DB_HOST=$DB_HOST,DB_USER=$DB_USER,DB_PASSWORD=$DB_PASS,DB_NAME=$DB_NAME,DB_PORT=$DB_PORT,REDIS_HOST=$REDIS_HOST,REDIS_PORT=$REDIS_PORT,REDIS_DB=$REDIS_DB,REDIS_URL=$REDIS_URL,PYTHONUNBUFFERED=1,ORIGINS=$ORIGINS"
 
 # === Build Once, Tag Twice ===
 echo "Building image..."
@@ -48,6 +50,8 @@ gcloud run deploy $SERVICE_NAME \
   --port=8002 \
   --max-instances=2 \
   --min-instances=1 \
+  --min=0 \
+  --max=2 \
   --service-account=gwx-cloudrun-sa-01@$PROJECT_ID.iam.gserviceaccount.com \
   --add-cloudsql-instances=$CONN_NAME \
   --set-env-vars="$SHARED_ENV" \

@@ -5,7 +5,7 @@ from fastapi import APIRouter, File, UploadFile
 
 from src.data.clients.redis import extract_queue
 from src.tasks.payu_tasks import execute_task
-from src.utils.file_upload import save_file_cloudinary
+from src.utils.file_upload import save_file
 from src.utils.job_status import get_job_status, set_job_status
 
 extract_router = APIRouter(prefix="/extract")
@@ -14,7 +14,7 @@ extract_router = APIRouter(prefix="/extract")
 @extract_router.post("/invoice")
 async def extract_data_from_invoice(file: UploadFile = File(...)) -> dict[str, Any]:
     file_id = str(uuid.uuid4())
-    file_path, ext, gcs_url = await save_file_cloudinary(file, "invoices")
+    file_path, ext, gcs_url = await save_file(file, "invoices")
     filename = file.filename or "upload"
 
     set_job_status(file_id, "processing")
@@ -36,7 +36,7 @@ async def extract_data_from_invoice(file: UploadFile = File(...)) -> dict[str, A
 @extract_router.post("/purchase-order")
 async def extract_data_from_po(file: UploadFile = File(...)) -> dict[str, Any]:
     file_id = str(uuid.uuid4())
-    file_path, ext, gcs_url = await save_file_cloudinary(file, "purchase_orders")
+    file_path, ext, gcs_url = await save_file(file, "purchase_orders")
     filename = file.filename or "upload"
 
     set_job_status(file_id, "processing")

@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     mail_from: str
     mail_server: str
 
+    origins: str
+
     model_config = SettingsConfigDict(env_file=".env")
 
 
