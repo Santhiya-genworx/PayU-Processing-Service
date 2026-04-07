@@ -1,4 +1,7 @@
-from __future__ import annotations
+"""
+Authentication middleware for the PayU Processing Service API.
+This module defines the AuthMiddleware class, which is responsible for validating JWT tokens in incoming requests. It checks for the presence of a token in the Authorization header or cookies, decodes the token, and attaches the user information to the request state for use in downstream route handlers.
+If the token is missing, invalid, or expired, the middleware returns a 401 Unauthorized response"""
 
 from collections.abc import Awaitable, Callable
 
@@ -7,10 +10,18 @@ from fastapi.responses import JSONResponse
 from jose import JWTError, jwt
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from src.core.config.settings import settings
+from src.config.settings import settings
+
+"""Authentication middleware for the PayU Processing Service API.
+This module defines the AuthMiddleware class, which is responsible for validating JWT tokens in incoming requests. It checks for the presence of a token in the Authorization header or cookies, decodes the token, and attaches the user information to the request state for use in downstream route handlers.
+If the token is missing, invalid, or expired, the middleware returns a 401 Unauthorized response
+"""
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
+    """Middleware to authenticate requests using JWT tokens.
+    This middleware checks for a JWT token in the Authorization header or cookies, validates it, and attaches the user information to the request state. If authentication fails, it returns a 401 response."""
+
     async def dispatch(
         self,
         request: Request,

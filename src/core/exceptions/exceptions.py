@@ -1,3 +1,5 @@
+"""Module defining custom exceptions for the PayU Processing Service application. This module includes a base exception class, AppException, which extends FastAPI's HTTPException to provide a standardized way to handle errors across the application. Additionally, specific exceptions such as NotFoundException, UnauthorizedException, ConflictException, and BadRequestException are defined to represent common error scenarios that may occur during the processing of invoices and purchase orders. Each exception class includes a default error message and an appropriate HTTP status code, allowing for consistent error handling and response generation throughout the application."""
+
 from fastapi import HTTPException, status
 
 

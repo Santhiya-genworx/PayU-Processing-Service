@@ -1,3 +1,5 @@
+"""API application setup for the PayU Processing Service."""
+
 from fastapi import APIRouter
 
 from src.api.rest.routes.docs_router import docs_router
@@ -23,6 +25,9 @@ app_router.include_router(invoice_router)
 
 @app_router.on_event("startup")
 async def on_start() -> None:
+    """Startup event handler for the API application.
+    This function is called when the application starts up. It initializes the database by applying any pending migrations and logs that the application has started. This ensures that the database schema is up to date before the application begins handling requests.
+    """
     logger.info("App started")
     async with engine.begin():
         await init_db()

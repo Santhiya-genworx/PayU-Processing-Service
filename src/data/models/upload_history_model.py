@@ -1,4 +1,4 @@
-from __future__ import annotations
+"""module: upload_history_model.py"""
 
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -14,6 +14,8 @@ if TYPE_CHECKING:
 
 
 class InvoiceUploadHistory(Base):
+    """SQLAlchemy model representing the upload history of an invoice. This model defines the structure of the invoice_upload_history table in the database, including fields for history ID, invoice ID, old file URL, new file URL, and the date of the action. The id is the primary key for this table, and the invoice_id is a foreign key referencing the invoices table. The model establishes a relationship with the Invoice model (many-to-one), allowing for easy access to the parent invoice data. This model is used to track changes to invoice uploads, such as when an invoice file is updated or replaced, by storing the previous and new file URLs along with a timestamp of when the change occurred."""
+
     __tablename__ = "invoice_upload_history"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -28,6 +30,8 @@ class InvoiceUploadHistory(Base):
 
 
 class PurchaseOrderUploadHistory(Base):
+    """SQLAlchemy model representing the upload history of a purchase order. This model defines the structure of the purchase_order_upload_history table in the database, including fields for history ID, purchase order ID, old file URL, new file URL, and the date of the action. The id is the primary key for this table, and the po_id is a foreign key referencing the purchase_orders table. The model establishes a relationship with the PurchaseOrder model (many-to-one), allowing for easy access to the parent purchase order data. This model is used to track changes to purchase order uploads, such as when a purchase order file is updated or replaced, by storing the previous and new file URLs along with a timestamp of when the change occurred."""
+
     __tablename__ = "purchase_order_upload_history"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -38,4 +42,6 @@ class PurchaseOrderUploadHistory(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
-    purchase_order: Mapped["PurchaseOrder"] = relationship("PurchaseOrder", back_populates="history")
+    purchase_order: Mapped["PurchaseOrder"] = relationship(
+        "PurchaseOrder", back_populates="history"
+    )

@@ -1,13 +1,15 @@
+"""Module defining the validation agents for processing invoices and purchase orders. This module includes functions that perform various validation checks on the extracted data, such as vendor matching, line item matching, price checks, and quantity-price validation. Each function takes the current agent state as input and produces a list of AIMessage objects that describe the results of the validation checks. The module also includes a decision agent that synthesizes the results from all validation agents to make a final decision on whether to approve, review, or reject the invoice. The decision agent uses a structured prompt to guide the language model in making an informed decision based on the validation results, and it returns a structured output containing the decision status, confidence score, reasoning, and any necessary commands or email drafts for communication with vendors.  This modular design allows for clear separation of concerns, where each validation agent focuses on a specific aspect of the invoice processing, and the decision agent integrates these insights to drive the overall workflow effectively."""
+
 from typing import Any
-import json
-import re
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 from pydantic import SecretStr
 
+from src.config.settings import settings
 from src.control.validation_agent.validation_state import AgentState, Decision
-from src.core.config.settings import settings
+from src.observability.logging.logging_config import logger
+from src.schemas.graph_output_schema import GraphResult, MatchingOutput
 
 llm = ChatGroq(
     model="llama-3.3-70b-versatile",
@@ -15,44 +17,22 @@ llm = ChatGroq(
     api_key=SecretStr(settings.groq_api_key),
 )
 
+
 def _get_po_map(pos: list[Any]) -> dict[str, Any]:
+    """Helper function to create a mapping of purchase order IDs to their corresponding data. This function takes a list of purchase orders and constructs a dictionary where the keys are the purchase order IDs and the values are the purchase order data. This mapping allows for efficient lookup of purchase order information based on their IDs, which is essential for various validation checks that require referencing the associated purchase orders for a given invoice. Args:   pos (list[Any]): A list of purchase order objects, each containing an ID and associated data. Returns:    A dictionary mapping purchase order IDs (str) to their corresponding data (Any)."""
     return {po.po_id: po for po in pos}
 
 
 def _invoice_pos(invoice: Any, po_map: dict[str, Any]) -> list[Any]:
+    """Helper function to retrieve the purchase orders associated with a given invoice based on the purchase order IDs listed in the invoice. This function checks the 'po_id' field in the invoice, which may contain a single ID or a list of IDs, and uses the provided mapping of purchase order IDs to retrieve the corresponding purchase order data. The function returns a list of purchase orders that are linked to the invoice, allowing for further validation checks that require access to the details of these associated purchase orders. Args:   invoice (Any): The invoice object that contains a 'po_id' field referencing associated purchase orders. po_map (dict[str, Any]): A dictionary mapping purchase order IDs to their corresponding data. Returns:    A list of purchase order data objects that are associated with the given invoice based on the 'po_id' references."""
     if not invoice.po_id:
         return []
     ids: list[str] = invoice.po_id if isinstance(invoice.po_id, list) else [invoice.po_id]
     return [po_map[pid] for pid in ids if pid in po_map]
 
 
-def _to_str(content: Any) -> str:
-    if isinstance(content, str):
-        return content.strip()
-    if isinstance(content, list):
-        parts: list[str] = []
-        for item in content:
-            if isinstance(item, str):
-                parts.append(item.strip())
-            elif isinstance(item, dict):
-                parts.append(str(item))
-        return " ".join(parts)
-    return str(content)
-
-
-def _scenario(invoices: list[Any], pos: list[Any]) -> str:
-    ni, np = len(invoices), len(pos)
-    if ni == 1 and np == 0:
-        return "1 invoice, no PO"
-    if ni == 1 and np == 1:
-        return "1 invoice, 1 PO"
-    if ni == 1 and np > 1:
-        return f"1 invoice, {np} POs"
-    if ni > 1 and np == 1:
-        return f"{ni} invoices, 1 PO"
-    return f"{ni} invoices, {np} POs"
-
 def vendor_match_node(state: AgentState) -> dict[str, list[AIMessage]]:
+    """Agent function to perform vendor matching validation between invoices and purchase orders. This function checks if the vendor information (name, email, GST number) in the invoice matches the corresponding information in the associated purchase orders. It generates AIMessage objects that indicate whether there is a vendor mismatch, GST mismatch, or if the vendor information is consistent across the invoice and purchase orders. If there are no associated purchase orders, it generates a message indicating that the vendor match was skipped. The results of these checks are returned in a dictionary format containing a list of AIMessage objects that describe the validation outcomes for the vendor matching process. Args:   state (AgentState): The current state of the agent, which includes the extracted invoice and purchase order data needed for validation. Returns:    A dictionary containing a list of AIMessage objects that describe the results of the vendor matching validation."""
     invoices = state.get("invoices", [])
     pos = state.get("pos", [])
     messages: list[AIMessage] = []
@@ -82,6 +62,7 @@ def vendor_match_node(state: AgentState) -> dict[str, list[AIMessage]]:
 
 
 async def line_item_match_agent(state: AgentState) -> dict[str, list[AIMessage]]:
+    """Agent function to perform line item matching validation between invoices and purchase orders. This function checks if the line items listed in the invoice match the corresponding items in the associated purchase orders based on their descriptions. It generates AIMessage objects that indicate whether each invoice item is found in the purchase orders, and if so, whether there are any discrepancies in quantity or unit price. If there are no associated purchase orders, it generates a message indicating that the line item match was skipped. The results of these checks are returned in a dictionary format containing a list of AIMessage objects that describe the validation outcomes for the line item matching process. Args:   state (AgentState): The current state of the agent, which includes the extracted invoice and purchase order data needed for validation. Returns:    A dictionary containing a list of AIMessage objects that describe the results of the line item matching validation."""
     invoices = state.get("invoices", [])
     pos = state.get("pos", [])
 
@@ -113,6 +94,7 @@ async def line_item_match_agent(state: AgentState) -> dict[str, list[AIMessage]]
 
 
 def price_check_node(state: AgentState) -> dict[str, list[AIMessage]]:
+    """Agent function to perform price validation checks on invoice line items. This function calculates the expected total price for each line item based on the quantity and unit price, and compares it to the total price listed in the invoice. It generates AIMessage objects that indicate whether there is a line calculation error (where the expected total does not match the listed total) or if the price is correct. The results of these checks are returned in a dictionary format containing a list of AIMessage objects that describe the validation outcomes for the price check process. Args:   state (AgentState): The current state of the agent, which includes the extracted invoice data needed for validation. Returns:    A dictionary containing a list of AIMessage objects that describe the results of the price validation checks."""
     invoices = state.get("invoices", [])
     messages: list[AIMessage] = []
 
@@ -130,6 +112,7 @@ def price_check_node(state: AgentState) -> dict[str, list[AIMessage]]:
 
 
 def quantity_price_match_agent(state: AgentState) -> dict[str, list[AIMessage]]:
+    """Agent function to perform quantity and price validation checks between invoices and purchase orders. This function compares the quantities and unit prices of line items in the invoice against the corresponding items in the associated purchase orders. It generates AIMessage objects that indicate whether there are any over-invoicing issues (where the invoiced quantity exceeds the PO quantity), partial delivery issues (where the invoiced quantity is less than the PO quantity), or unit price mismatches. If there are no associated purchase orders, it generates a message indicating that the quantity and price match was skipped. The results of these checks are returned in a dictionary format containing a list of AIMessage objects that describe the validation outcomes for the quantity and price matching process. Args:   state (AgentState): The current state of the agent, which includes the extracted invoice and purchase order data needed for validation. Returns:    A dictionary containing a list of AIMessage objects that describe the results of the quantity and price validation checks."""
     invoices = state.get("invoices", [])
     pos = state.get("pos", [])
     messages: list[AIMessage] = []
@@ -206,98 +189,19 @@ def quantity_price_match_agent(state: AgentState) -> dict[str, list[AIMessage]]:
 
     return {"messages": messages}
 
-_DECISION_SYSTEM_PROMPT = """
-You are an invoice validation decision agent. You will receive a list of validation
-results produced by earlier specialist agents. Each result is a short message
-describing what was checked and what was found.
 
-Your job is to read ALL messages carefully and decide ONE of three outcomes:
+async def decision_agent(state: AgentState) -> GraphResult:
+    """Agent function to synthesize validation results and make a final decision on whether to approve, review, or reject an invoice. This function reads the messages produced by previous validation agents, applies a strict decision hierarchy to determine the overall status of the invoice, and generates a structured output containing the decision status, confidence score, reasoning, and any necessary commands or email drafts for communication with vendors. The decision is based on the presence of hard failures (which lead to rejection), soft warnings (which lead to review), or a clean pass (which leads to approval). The function uses a structured prompt to guide the language model in making an informed decision based on the validation results. Args:   state (AgentState): The current state of the agent, which includes the messages from previous validation agents that describe the outcomes of various checks performed on the invoice. Returns:    A dictionary containing the final decision status ("approve", "review", or "reject"), a confidence score, reasoning for the decision, and any commands or email drafts if applicable."""
+    logger.info("Decision..")
 
-- "approve"  → All checks passed. No issues found.
-- "review"   → Minor issues that need human review but are not outright rejections.
-- "reject"   → Hard failures that must not be approved.
-
-Decision hierarchy (strict):
-1. If ANY hard failure is present → "reject", regardless of other results.
-2. If no hard failures but soft warnings exist → "review".
-3. Only decide "approve" when every single check passed cleanly.
-
-Important:
-- Read the full sentence of each message for intent — do not just scan for keywords.
-- Do NOT be influenced by message order. Read everything before deciding.
-- A message saying "skipped" or "no PO" is neutral — not a pass or a failure.
-
-Return ONLY a valid JSON object with no markdown fences, no preamble, no explanation:
-{
-  "status": "approve" | "review" | "reject",
-  "confidence_score": <float 0.0–1.0>,
-  "reasoning": "<one concise sentence>",
-  "command": "<most critical issue found, or 'Approved' if approved>"
-}
-""".strip()
-
-_MAIL_DRAFT_SYSTEM_PROMPT = """
-You are a professional accounts payable coordinator drafting emails to vendors
-about invoice discrepancies.
-
-You will receive:
-- The validation status: either "review" or "reject"
-- A list of validation findings for the invoice
-
-Read the findings carefully and draft a clear, professional, concise email to the
-vendor. Use your own judgment on tone and content based on what the findings say —
-do not rely on any fixed rules or keywords.
-
-- Keep the email under 200 words.
-- Always reference any invoice or PO IDs mentioned in the findings.
-- Do not make up data that is not present in the findings.
-
-Return ONLY a valid JSON object with no markdown fences, no preamble, no explanation:
-{
-  "mail_to": "vendor@example.com",
-  "mail_subject": "<subject line>",
-  "mail_body": "<full email body>"
-}
-""".strip()
-
-def _parse_llm_decision(raw: str) -> dict[str, Any]:
-    """
-    Robustly extract the JSON decision from LLM output even when the model
-    wraps it in markdown fences or adds stray commentary.
-    """
-    cleaned = re.sub(r"```(?:json)?", "", raw).strip().rstrip("`").strip()
-
-    try:
-        return json.loads(cleaned)
-    except json.JSONDecodeError:
-        pass
-
-    match = re.search(r"\{.*\}", cleaned, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group())
-        except json.JSONDecodeError:
-            pass
-
-    return {
-        "status": "review",
-        "confidence_score": 0.5,
-        "reasoning": "Decision agent returned unparseable output — flagged for human review.",
-        "command": "PARSE_ERROR",
-    }
-
-
-async def decision_agent(state: AgentState):
-    print("Decision..")
-
-    invoices     = state.get("invoices", [])
-    pos          = state.get("pos", [])
-    invoice      = invoices[0] if invoices else None
-    po           = pos[0] if pos else None
+    invoices = state.get("invoices", [])
+    pos = state.get("pos", [])
+    invoice = invoices[0] if invoices else None
+    po = pos[0] if pos else None
 
     vendor_email = invoice.vendor.email if invoice else "vendor@example.com"
-    vendor_name  = invoice.vendor.name if invoice else "Vendor"
-    po_id        = po.po_id if po else "N/A"
+    vendor_name = invoice.vendor.name if invoice else "Vendor"
+    po_id = po.po_id if po else "N/A"
     invoice_date = str(invoice.invoice_date) if invoice and invoice.invoice_date else "N/A"
     invoice_type = "SERVICE (no PO exists)" if po is None else "PRODUCT (PO exists)"
 
@@ -404,10 +308,11 @@ async def decision_agent(state: AgentState):
 
             Return the final structured decision.
             """
-        )
+        ),
     ]
 
-    result   = await llm.with_structured_output(Decision).ainvoke(prompt)
-    decision = result.model_dump()
+    result = await llm.with_structured_output(Decision).ainvoke(prompt)
+    decision: Decision = Decision.model_validate(result)
 
-    return {"output": decision}
+    result = GraphResult(output=MatchingOutput.model_validate(decision))
+    return result

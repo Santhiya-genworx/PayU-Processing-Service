@@ -1,5 +1,6 @@
+"""Module: purchase_order_service.py"""
+
 import uuid
-from typing import Any
 
 from fastapi import Depends
 from sqlalchemy.exc import SQLAlchemyError
@@ -23,10 +24,13 @@ from src.data.models.vendor_model import Vendor
 from src.data.repositories.base_repository import (
     commit_transaction,
     delete_data_by_any,
+    get_all_matching_groups_containing_po,
     get_data_by_any,
     insert_data,
     update_data_by_any,
+    update_data_by_id,
 )
+from src.schemas.docs_schema import CommonResponse
 from src.schemas.purchase_order_schema import PurchaseOrderRequest
 
 
@@ -34,7 +38,8 @@ async def uploadPurchaseOrder(
     po: PurchaseOrderRequest,
     file_url: str,
     db: AsyncSession = Depends(get_db),
-) -> dict[str, Any]:
+) -> CommonResponse:
+    """Upload a new purchase order, insert into DB, then backfill any matching groups that reference this po_id to is_po_matched = True if all POs are now present. This function first checks if the vendor associated with the purchase order already exists in the database and creates a new vendor record if necessary. It then checks for duplicate purchase orders to prevent overwriting existing data. If the purchase order is unique, it inserts the new purchase order and its associated ordered items into the database. After successfully inserting the purchase order, it calls a helper function to backfill any matching groups that reference this po_id, which will update those groups to indicate that the PO has been matched and enqueue them for validation. If any errors occur during this process, appropriate exceptions are raised with details about the failure.   This function ensures that any pending matches that were waiting for this PO to be uploaded are now processed accordingly."""
     try:
         vendors = await get_data_by_any(Vendor, db, email=po.vendor.email)
         vendor = vendors[0] if vendors else None
@@ -55,7 +60,6 @@ async def uploadPurchaseOrder(
                 ifsc_code=po.vendor.ifsc_code,
             )
             await commit_transaction(db)
-
             vendors = await get_data_by_any(Vendor, db, email=po.vendor.email)
             vendor = vendors[0] if vendors else None
 
@@ -94,7 +98,7 @@ async def uploadPurchaseOrder(
 
         await _backfill_po_match(po.po_id, db)
 
-        return {"message": f"Purchase Order {po.po_id} uploaded successfully"}
+        return CommonResponse(message=f"Purchase Order {po.po_id} uploaded successfully")
 
     except SQLAlchemyError as err:
         await db.rollback()
@@ -105,7 +109,8 @@ async def overridePurchaseOrder(
     po: PurchaseOrderRequest,
     file_url: str,
     db: AsyncSession = Depends(get_db),
-) -> dict[str, Any]:
+) -> CommonResponse:
+    """Override an existing PO, update DB, then update any matching groups that reference this po_id to is_po_matched = True and enqueue for matching. Similar to uploadPurchaseOrder but with additional checks to ensure the PO exists and belongs to the correct vendor, and it also records the upload history for audit purposes. After updating the PO, it backfills any matching groups that reference this po_id to ensure they are processed now that the PO has been overridden.  This function ensures that any pending matches that were waiting for this PO to be uploaded are now processed accordingly."""
     try:
         vendors = await get_data_by_any(Vendor, db, email=po.vendor.email)
         vendor = vendors[0] if vendors else None
@@ -160,7 +165,7 @@ async def overridePurchaseOrder(
 
         await _backfill_po_match(po.po_id, db)
 
-        return {"message": f"Purchase Order {po.po_id} overridden successfully"}
+        return CommonResponse(message=f"Purchase Order {po.po_id} overridden successfully")
 
     except SQLAlchemyError as err:
         await db.rollback()
@@ -168,39 +173,37 @@ async def overridePurchaseOrder(
 
 
 async def _backfill_po_match(po_id: str, db: AsyncSession) -> None:
-    waiting_rows = await get_data_by_any(InvoiceMatching, db, po_id=po_id, is_po_matched=False)
+    """Helper function to backfill matching groups that reference the given po_id. This function checks for any matching groups that contain the specified po_id in their list of associated POs and updates those groups to indicate that the PO has now been matched. It then enqueues a background task to validate the matching group, which will determine the final matching decision based on the presence of all associated invoices and POs. This ensures that any pending matches that were waiting for this PO to be uploaded are now processed accordingly."""
+    groups = await get_all_matching_groups_containing_po(db, po_id)
 
-    if not waiting_rows:
-        return
+    for group in groups:
+        # Skip groups already matched/processing
+        if group.is_po_matched is True:
+            continue
 
-    affected_invoice_ids: set[str] = {
-        row.invoice_id for row in waiting_rows if row.invoice_id is not None
-    }
+        # Check if every po_id in this group now exists in the DB
+        all_present = True
+        for gpo_id in group.pos or []:
+            po_records = await get_data_by_any(PurchaseOrder, db, po_id=gpo_id)
+            if not po_records:
+                all_present = False
+                break
 
-    await update_data_by_any(
-        InvoiceMatching,
-        db,
-        {"po_id": po_id, "is_po_matched": False},
-        is_po_matched=True,
-    )
-
-    await commit_transaction(db)
-
-    for invoice_id in affected_invoice_ids:
-        all_rows = await get_data_by_any(InvoiceMatching, db, invoice_id=invoice_id)
-
-        if all_rows and all(row.is_po_matched for row in all_rows):
-            _enqueue_validation(invoice_id, "new")
+        if all_present and group.pos:
+            await update_data_by_id(InvoiceMatching, group.id, db, is_po_matched=True)
+            await commit_transaction(db)
+            _enqueue_validation(group.id, "new")
 
 
-def _enqueue_validation(invoice_id: str, operation_type: str) -> None:
+def _enqueue_validation(group_id: int, operation_type: str) -> None:
+    """Enqueue a background task to validate the matching group now that all POs are present. The task will be picked up by a worker and will execute the necessary logic to determine the matching decision for the group based on its invoices and POs.   The operation_type parameter indicates whether this validation is triggered by a new upload or an override, which can be used to customize the validation logic if needed.  This function does not return any value but ensures that the validation process is initiated for the specified matching group."""
     from src.data.clients.redis import match_queue
     from src.tasks.payu_tasks import execute_task
 
     match_queue.enqueue(
         execute_task,
         {
-            "invoice_id": invoice_id,
+            "group_id": group_id,
             "task_type": "validate_invoice",
             "type": operation_type,
             "job_id": str(uuid.uuid4()),

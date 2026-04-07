@@ -1,3 +1,4 @@
+"""Module: runner.py"""
 from __future__ import annotations
  
 import hashlib
@@ -17,6 +18,7 @@ _DEFAULT_MIGRATIONS_DIR = Path(__file__).resolve().parent / "versions"
  
 @dataclass(frozen=True, slots=True)
 class MigrationFile:
+    """Represents a database migration file with its metadata. This dataclass is used to store information about each migration file, including its unique identifier (derived from the filename), version number, name, checksum of the SQL content, the raw SQL string, and the file path. The identifier is typically a combination of the version number and name, ensuring uniqueness across migrations. The checksum is computed using SHA-256 to allow for integrity checks when validating applied migrations against their corresponding files. This class is immutable and uses slots for memory efficiency."""
     identifier: str
     version_number: str
     name: str
@@ -26,6 +28,7 @@ class MigrationFile:
  
  
 def discover_migrations(migrations_dir: Path | None = None) -> list[MigrationFile]:
+    """Discovers migration files in the specified directory. This function looks for SQL files in the given directory (or the default migrations directory if none is provided) that match the expected filename pattern of '<version_number>_<name>.sql'. It validates that each file has a unique identifier, is not empty, and computes a checksum for the contents of the file. The function returns a list of MigrationFile objects representing the discovered migrations, sorted by their version numbers. If any issues are found with the migration files (such as invalid filenames, duplicates, or empty files), appropriate exceptions are raised with details about the problem."""    
     directory = migrations_dir or _DEFAULT_MIGRATIONS_DIR
     if not directory.exists():
         raise FileNotFoundError(f"Migration directory does not exist: {directory}")
@@ -70,6 +73,7 @@ async def apply_migrations(
     conn: AsyncConnection,
     migrations_dir: Path | None = None,
 ) -> None:
+    """Applies pending database migrations in order. This function discovers migration files in the specified directory, checks which migrations have already been applied by querying the schema_migrations table, and applies any new migrations in order of their version numbers. It ensures that the schema_migrations table exists before checking for applied migrations and validates the integrity of already applied migrations by comparing checksums. If a migration file has been altered after being applied (checksum mismatch), it raises a RuntimeError to prevent potential issues. If any errors occur during the database operations, they will be raised and can be handled by the calling function.   This function is typically called during the initialization of the database connection to ensure that the database schema is up to date before handling any application logic.  """
     migrations = discover_migrations(migrations_dir)
     await _ensure_schema_migrations_table(conn)
  
@@ -122,6 +126,7 @@ async def apply_migrations(
  
  
 async def _ensure_schema_migrations_table(conn: AsyncConnection) -> None:
+    """Ensures that the schema_migrations table exists in the database. This table is used to track which migrations have been applied, along with their version numbers, names, and checksums. If the table does not exist, it will be created. If the table already exists but is missing any of the expected columns (version_number, name, checksum), those columns will be added. This function is called at the beginning of the apply_migrations function to ensure that the migration tracking infrastructure is in place before attempting to apply any migrations. If any errors occur during the database operations, they will be raised and can be handled by the calling function."""
     await conn.exec_driver_sql(
         """
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -149,6 +154,7 @@ async def _validate_or_backfill_migration_record(
     migration: MigrationFile,
     existing: dict[str, str | None],
 ) -> None:
+    """Validates that an already applied migration has the same checksum as the current migration file. If the version_number and name are missing from the existing record, it backfills them from the migration file. If there is a checksum mismatch, it raises a RuntimeError to prevent potential issues from an altered migration file. This function ensures the integrity of applied migrations and helps maintain a consistent state of the database schema. If any errors occur during the database operations, they will be raised and can be handled by the calling function. """
     checksum = existing.get("checksum")
     if checksum:
         if checksum != migration.checksum:
@@ -179,6 +185,7 @@ async def _validate_or_backfill_migration_record(
  
  
 def _split_sql_statements(sql: str) -> list[str]:
+    """Splits a SQL string into individual statements, correctly handling semicolons within strings, comments, and dollar-quoted sections. Returns a list of executable SQL statements without trailing semicolons. This function uses a state machine approach to track whether the current position is within a single-quoted string, double-quoted string, line comment, block comment, or dollar-quoted section, ensuring that semicolons are only treated as statement separators when they are outside of these contexts. If the input SQL string is empty or contains only whitespace, it returns an empty list. If any statements are found, they are stripped of leading and trailing whitespace before being returned in the list."""
     statements: list[str] = []
     current: list[str] = []
     i = 0

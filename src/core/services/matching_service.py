@@ -1,9 +1,10 @@
+"""Module: matching_service.py"""
+
 from typing import Any, cast
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from PayU_Processing_Service.src.schemas.purchase_order_schema import PurchaseOrderRequest
 from sqlalchemy.orm import selectinload
 
-from src.schemas.matching_schema import InvoiceMatchingBase
 from src.control.validation_agent.validation_graph import invoke_graph
 from src.core.exceptions.exceptions import NotFoundException
 from src.data.clients.database import AsyncSessionLocal
@@ -16,99 +17,61 @@ from src.data.models.purchase_order_model import PurchaseOrder
 from src.data.repositories.base_repository import (
     commit_transaction,
     get_data_by_any,
-    update_data_by_any,
+    get_data_by_id,
+    update_data_by_id,
 )
 from src.schemas.graph_output_schema import GraphResult
+from src.schemas.invoice_schema import InvoiceRequest
+from src.schemas.matching_schema import InvoiceMatchingBase
 
 
-async def validateInvoicePo(invoice_id: str, operation_type: str) -> GraphResult:
-    """
-    Validates a group of invoices against their shared PO(s).
-
-    Handles two relationship shapes:
-      - 1 PO : N Invoices  → all invoices sharing the same PO are validated together
-      - N POs : 1 Invoice  → the single invoice is validated against all its linked POs
-
-    In both cases invoke_graph receives the full set of invoices + POs so the AI
-    can reason about the combined picture. One decision is returned and written
-    to every InvoiceMatching row in the group.
-    """
+async def validateInvoicePo(group_id: int, operation_type: str) -> GraphResult:
+    """Function to validate the matching of an invoice and purchase order group using a graph-based approach. This function retrieves the matching group based on the provided group ID, loads all associated invoices and purchase orders, and then invokes a validation graph to determine the matching status. The result from the graph includes a decision status, confidence score, and email details for notifications. The function updates the matching group in the database with the decision results and returns the graph result. If any errors occur during this process, appropriate exceptions are raised with details about the failure."""
     try:
         async with AsyncSessionLocal() as db:
+            group: InvoiceMatching | None = await get_data_by_id(InvoiceMatching, group_id, db)
+            if not group:
+                raise NotFoundException(detail=f"Matching group {group_id} not found")
 
-            # ── Step 1: load the triggering invoice ──────────────────────────
-            invoice_records = await get_data_by_any(
-                Invoice,
-                db,
-                options=[
-                    selectinload(Invoice.vendor),
-                    selectinload(Invoice.invoice_items),
-                ],
-                invoice_id=invoice_id,
-            )
-            trigger_invoice = invoice_records[0] if invoice_records else None
-            if not trigger_invoice:
-                raise NotFoundException(detail=f"Invoice {invoice_id} not found")
+            invoice_ids: list[str] = group.invoices or []
+            po_ids: list[str] = group.pos or []
 
-            # ── Step 2: find all POs linked to the triggering invoice ─────────
-            trigger_matching_rows = await get_data_by_any(
-                InvoiceMatching, db, invoice_id=invoice_id
-            )
-            all_po_ids: set[str] = {
-                row.po_id for row in trigger_matching_rows if row.po_id is not None
-            }
-
-            # ── Step 3: expand — find ALL invoices that share any of those POs ─
-            #
-            # Example: PO-X is linked to Invoice-1 and Invoice-2.
-            # When Invoice-2 arrives and triggers validation, we reverse-lookup
-            # PO-X to discover Invoice-1 and include it in the validation group.
-            # This ensures invoke_graph always sees the full picture.
-            all_invoice_ids: set[str] = {invoice_id}
-
-            for po_id in all_po_ids:
-                sibling_rows = await get_data_by_any(
-                    InvoiceMatching, db, po_id=po_id
-                )
-                for row in sibling_rows:
-                    if row.invoice_id:
-                        all_invoice_ids.add(row.invoice_id)
-
-            # ── Step 4: load all invoice ORM objects ──────────────────────────
-            invoices_data: list[Invoice] = []
-
-            for inv_id in all_invoice_ids:
-                if inv_id == invoice_id:
-                    trigger_invoice.po_id = list(all_po_ids)
-                    invoices_data.append(trigger_invoice)
-                    continue
-
-                sibling_records = await get_data_by_any(
+            invoices_data: list[InvoiceRequest] = []
+            for invoice_id in invoice_ids:
+                records = await get_data_by_any(
                     Invoice,
                     db,
                     options=[
                         selectinload(Invoice.vendor),
                         selectinload(Invoice.invoice_items),
                     ],
-                    invoice_id=inv_id,
+                    invoice_id=invoice_id,
                 )
-                if sibling_records:
-                    sibling_invoice = sibling_records[0]
-                    sibling_matching_rows = await get_data_by_any(
-                        InvoiceMatching, db, invoice_id=inv_id
-                    )
-                    sibling_invoice.po_id = [
-                        row.po_id
-                        for row in sibling_matching_rows
-                        if row.po_id is not None
-                    ]
-                    invoices_data.append(sibling_invoice)
+                if not records:
+                    raise NotFoundException(detail=f"Invoice {invoice_id} not found")
+                inv = records[0]
 
-            # ── Step 5: load all PO ORM objects ───────────────────────────────
-            pos_data: list[PurchaseOrder] = []
+                invoice_schema = InvoiceRequest.model_validate(
+                    {
+                        "invoice_id": inv.invoice_id,
+                        "vendor": inv.vendor,
+                        "po_id": po_ids,
+                        "invoice_date": inv.invoice_date,
+                        "due_date": inv.due_date,
+                        "invoice_items": inv.invoice_items,
+                        "currency_code": inv.currency_code,
+                        "subtotal": float(inv.subtotal),
+                        "tax_amount": float(inv.tax_amount),
+                        "discount_amount": float(inv.discount_amount or 0),
+                        "total_amount": float(inv.total_amount),
+                    }
+                )
 
-            for po_id in all_po_ids:
-                po_records = await get_data_by_any(
+                invoices_data.append(invoice_schema)
+
+            pos_data: list[PurchaseOrderRequest] = []
+            for po_id in po_ids:
+                records = await get_data_by_any(
                     PurchaseOrder,
                     db,
                     options=[
@@ -117,26 +80,27 @@ async def validateInvoicePo(invoice_id: str, operation_type: str) -> GraphResult
                     ],
                     po_id=po_id,
                 )
-                if not po_records:
+                if not records:
                     raise NotFoundException(detail=f"Purchase Order {po_id} not found")
-                pos_data.append(po_records[0])
+                po = records[0]
 
-            # ── Step 6: invoke the validation graph ───────────────────────────
-            #
-            # invoke_graph now receives the full group:
-            #   1 PO  : 2 invoices → invoices_data=[inv1, inv2], pos_data=[po]
-            #   2 POs : 1 invoice  → invoices_data=[inv],        pos_data=[po1, po2]
-            #
-            # The graph evaluates the group as a whole and returns ONE decision.
+                po_schema = PurchaseOrderRequest.model_validate(
+                    {
+                        "po_id": po.po_id,
+                        "vendor": po.vendor,
+                        "gl_code": po.gl_code,
+                        "currency_code": po.currency_code,
+                        "total_amount": float(po.total_amount),
+                        "ordered_date": po.ordered_date,
+                        "ordered_items": po.ordered_items,
+                    }
+                )
+
+                pos_data.append(po_schema)
+
             raw_result: Any = await invoke_graph(invoices_data, pos_data)
             result: GraphResult = cast(GraphResult, raw_result)
 
-            # ── Step 7: write the same decision to every row in the group ─────
-            #
-            # Since the decision is about the PO-Invoice group as a whole
-            # (do all these invoices together satisfy this PO?), the same
-            # outcome — approve / review / reject — is applied to every
-            # InvoiceMatching row that belongs to this group.
             output: dict[str, Any] | None = dict(result).get("output")
 
             if output:
@@ -148,15 +112,7 @@ async def validateInvoicePo(invoice_id: str, operation_type: str) -> GraphResult
                     "mail_subject": output["mail_subject"],
                     "mail_body": output["mail_body"],
                 }
-
-                for inv_id in all_invoice_ids:
-                    await update_data_by_any(
-                        InvoiceMatching,
-                        db,
-                        {"invoice_id": inv_id},
-                        **decision_fields,
-                    )
-
+                await update_data_by_id(InvoiceMatching, group_id, db, **decision_fields)
                 await commit_transaction(db)
 
             return result
@@ -165,9 +121,9 @@ async def validateInvoicePo(invoice_id: str, operation_type: str) -> GraphResult
         raise
 
 
-async def getInvoiceDecision(invoice_id: str, db: AsyncSession) -> list[InvoiceMatchingBase]:
-    try:
-        matchings = await get_data_by_any(InvoiceMatching, db, invoice_id=invoice_id)
-        return matchings
-    except Exception:
-        raise
+async def getInvoiceDecision(invoice_id: str, db: Any) -> list[InvoiceMatchingBase]:
+    """Function to retrieve the matching decision for a specific invoice. This function queries the database to find the matching group that contains the given invoice ID and returns a list of InvoiceMatchingBase objects representing the matching decision for that invoice. If no matching group is found, it returns an empty list. If any errors occur during the database operations, appropriate exceptions are raised with details about the failure."""
+    from src.data.repositories.base_repository import get_matching_group_containing_invoice
+
+    group = await get_matching_group_containing_invoice(db, invoice_id)
+    return [group] if group else []

@@ -112,9 +112,9 @@ CREATE INDEX IF NOT EXISTS idx_po_upload_history_po_id ON purchase_order_upload_
 
 CREATE TABLE IF NOT EXISTS invoice_matching (
     id                SERIAL PRIMARY KEY,
-    invoice_id        VARCHAR(255)            NOT NULL REFERENCES invoices(invoice_id),
-    po_id             VARCHAR(255),
-    is_po_matched     BOOLEAN                 NOT NULL DEFAULT FALSE,
+    invoices          TEXT[]                  NOT NULL DEFAULT '{}',
+    pos               TEXT[]                  NOT NULL DEFAULT '{}',
+    is_po_matched     BOOLEAN                 NULL,          -- NULL = waiting, TRUE = ready
     status            matching_status_enum    NOT NULL DEFAULT 'pending',
     decision          decision_status_enum,
     command           VARCHAR(255),
@@ -123,11 +123,9 @@ CREATE TABLE IF NOT EXISTS invoice_matching (
     mail_subject      VARCHAR(255),
     mail_body         TEXT,
     matched_at        TIMESTAMPTZ             NOT NULL DEFAULT NOW(),
-    updated_at        TIMESTAMPTZ             NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT uq_invoice_po_matching UNIQUE (invoice_id, po_id)
+    updated_at        TIMESTAMPTZ             NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_invoice_matching_invoice_id ON invoice_matching (invoice_id);
-CREATE INDEX IF NOT EXISTS idx_invoice_matching_po_id ON invoice_matching (po_id);
-CREATE INDEX IF NOT EXISTS idx_invoice_matching_status ON invoice_matching (status);
+CREATE INDEX IF NOT EXISTS idx_invoice_matching_invoices ON invoice_matching USING GIN (invoices);
+CREATE INDEX IF NOT EXISTS idx_invoice_matching_pos     ON invoice_matching USING GIN (pos);
+CREATE INDEX IF NOT EXISTS idx_invoice_matching_status  ON invoice_matching (status);

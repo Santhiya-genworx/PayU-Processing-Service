@@ -1,3 +1,5 @@
+"""module: worker.py"""
+
 from rq import Worker
 
 from src.data.clients.redis import (
@@ -14,7 +16,7 @@ try:
     pong = redis_connection.ping()
     logger.info(f"Redis connected — ping: {pong}")
 except Exception as e:
-    logger.error(f"Redis connection FAILED: {e}")
+    logger.exception(f"Redis connection FAILED: {e}")
     raise
 
 queues = [extract_queue, upload_queue, match_queue]
