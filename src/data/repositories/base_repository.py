@@ -1,3 +1,4 @@
+"""Module: base_repository.py"""
 from collections.abc import Sequence
 from typing import Any
 

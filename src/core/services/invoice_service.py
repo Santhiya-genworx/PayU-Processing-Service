@@ -185,7 +185,7 @@ async def _find_group_for_invoice(
     for po_id in po_ids:
         raw = await get_matching_group_containing_po(db, po_id)
         if raw:
-            return cast(InvoiceMatching, raw)  # ← fixes the no-any-return
+            return cast(InvoiceMatching, raw) 
 
     return None
 
