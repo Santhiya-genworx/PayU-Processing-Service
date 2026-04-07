@@ -1,7 +1,6 @@
-from __future__ import annotations
+"""module: user_model.py"""
 
 from datetime import datetime
-from enum import Enum as PyEnum
 
 from sqlalchemy import Boolean, DateTime, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
@@ -10,6 +9,8 @@ from src.data.clients.database import Base
 
 
 class User(Base):
+    """SQLAlchemy model representing a user in the system. This model defines the structure of the users table in the database, including fields for user ID, name, email, password, role, active status, and timestamps for creation and updates. The id is the primary key for this table and is set to auto-increment. The email field is unique to ensure that no two users can have the same email address. The role field can be used to define different levels of access or permissions for users (e.g., admin, regular user). The is_active field indicates whether the user's account is currently active. The created_at and updated_at fields automatically record when each user record is created and last updated, respectively. This model serves as the basis for managing user accounts and authentication within the system."""
+
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, unique=True, autoincrement=True)

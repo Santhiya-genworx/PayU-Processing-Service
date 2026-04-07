@@ -1,4 +1,4 @@
-from __future__ import annotations
+"""module: vendor_model.py"""
 
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -14,6 +14,8 @@ if TYPE_CHECKING:
 
 
 class Vendor(Base):
+    """SQLAlchemy model representing a vendor in the system. This model defines the structure of the vendors table in the database, including fields for vendor ID, name, email, address, country code, mobile number, GST number, bank details, and timestamps for creation and updates. The id is the primary key for this table and is set to auto-increment. The email and gst_number fields are unique to ensure that no two vendors can have the same email address or GST number. The model establishes relationships with the Invoice model (one-to-many) and the PurchaseOrder model (one-to-many), allowing for easy access to related data. This model serves as the basis for managing vendor information within the system, including contact details and financial information necessary for processing invoices and purchase orders."""
+
     __tablename__ = "vendors"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -34,4 +36,6 @@ class Vendor(Base):
     )
 
     invoices: Mapped[list["Invoice"]] = relationship("Invoice", back_populates="vendor")
-    purchase_orders: Mapped[list["PurchaseOrder"]] = relationship("PurchaseOrder", back_populates="vendor")
+    purchase_orders: Mapped[list["PurchaseOrder"]] = relationship(
+        "PurchaseOrder", back_populates="vendor"
+    )

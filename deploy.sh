@@ -60,25 +60,25 @@ gcloud run deploy $SERVICE_NAME \
   --vpc-egress=private-ranges-only
 
 # === Deploy Worker ===
-# echo "Deploying Worker..."
-# gcloud run deploy payu-worker \
-#   --image=$WORKER_IMAGE \
-#   --region=$REGION \
-#   --project=$PROJECT_ID \
-#   --platform=managed \
-#   --allow-unauthenticated \
-#   --service-account=gwx-cloudrun-sa-01@$PROJECT_ID.iam.gserviceaccount.com \
-#   --min-instances=1 \
-#   --max-instances=1 \
-#   --min=1 \
-#   --max=1 \
-#   --add-cloudsql-instances=$CONN_NAME \
-#   --set-env-vars="$SHARED_ENV" \
-#   --network=gwx-vpc-intern-01 \
-#   --subnet=gwx-sne-intern-01 \
-#   --vpc-egress=private-ranges-only \
-#   --command="sh" \
-#   --args="-c,python -m http.server 8002 & python -m src.utils.worker" \
-#   --no-deploy-health-check
+echo "Deploying Worker..."
+gcloud run deploy payu-worker \
+  --image=$WORKER_IMAGE \
+  --region=$REGION \
+  --project=$PROJECT_ID \
+  --platform=managed \
+  --allow-unauthenticated \
+  --service-account=gwx-cloudrun-sa-01@$PROJECT_ID.iam.gserviceaccount.com \
+  --min-instances=1 \
+  --max-instances=1 \
+  --min=1 \
+  --max=1 \
+  --add-cloudsql-instances=$CONN_NAME \
+  --set-env-vars="$SHARED_ENV" \
+  --network=gwx-vpc-intern-01 \
+  --subnet=gwx-sne-intern-01 \
+  --vpc-egress=private-ranges-only \
+  --command="sh" \
+  --args="-c,python -m http.server 8002 & python -m src.utils.worker" \
+  --no-deploy-health-check
 
 echo "Deployment completed!"
