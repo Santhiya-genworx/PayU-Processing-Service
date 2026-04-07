@@ -8,7 +8,7 @@ from src.data.migrations.runner import apply_migrations
 
 engine = create_async_engine(settings.db_url)
 
-AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+async_session_local = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
 
 class Base(DeclarativeBase):
@@ -22,11 +22,7 @@ engine = create_async_engine(
     pool_pre_ping=True,
 )
 
-AsyncSessionFactory = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
+
 
 
 async def init_db() -> None:
