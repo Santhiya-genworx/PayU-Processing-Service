@@ -13,7 +13,7 @@ from src.core.services.purchase_order_service import (
     overridePurchaseOrder,
     uploadPurchaseOrder,
 )
-from src.data.clients.database import async_session_local
+from src.data.clients.database import AsyncSessionLocal
 from src.schemas.invoice_schema import InvoiceRequest
 from src.schemas.purchase_order_schema import PurchaseOrderRequest
 from src.utils.job_status import set_job_status
@@ -42,7 +42,7 @@ async def _async_execute_task(data: dict[str, Any]) -> None:
     task_type: str = data.get("task_type", "")
     job_id: str = data.get("job_id", "")
 
-    async with async_session_local() as db:
+    async with AsyncSessionLocal() as db:
         try:
             result: dict[str, Any] | None | None = await _handle_task(task_type, data, db)
             set_job_status(job_id, "completed", result=result)
