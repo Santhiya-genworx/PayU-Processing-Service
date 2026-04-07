@@ -28,7 +28,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
         """Authenticate incoming requests using JWT tokens.
-        This method checks for a JWT token in the Authorization header or cookies, validates it, and attaches the user information to the request state. If authentication fails, it returns a 401 response.    """
+        This method checks for a JWT token in the Authorization header or cookies, validates it, and attaches the user information to the request state. If authentication fails, it returns a 401 response."""
 
         public_urls = ["/", "/docs", "/openapi.json", "/users/login", "/users/create"]
 

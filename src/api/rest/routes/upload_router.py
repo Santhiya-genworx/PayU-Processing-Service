@@ -1,21 +1,13 @@
 """This module defines the API routes for handling file uploads related to invoices and purchase orders. The routes are organized under the "/upload" prefix and utilize FastAPI's APIRouter for modularity. Each route accepts multipart form data, including a JSON string for additional data and an uploaded file. The routes interact with a Redis queue to enqueue tasks for processing the uploaded files asynchronously. The status of each upload job is tracked using a unique file ID, which can be used to query the status of the job through a dedicated endpoint. The module also includes functionality to save the uploaded files to a specified location and manage job statuses in a Redis store."""
 
-import json
-import uuid
 from typing import Any
 
 from fastapi import APIRouter, File, Form, UploadFile
 
-from src.core.services.upload_service import getUploadingStatus
-from src.core.services.upload_service import uploadData
-from src.data.clients.redis import upload_queue
+from src.core.services.upload_service import getUploadingStatus, uploadData
 from src.schemas.docs_schema import QueueResponse
-from src.tasks.payu_tasks import execute_task
-from src.utils.file_upload import save_file
-from src.utils.job_status import set_job_status
 
 upload_router = APIRouter(prefix="/upload")
-
 
 
 @upload_router.post("/invoice")

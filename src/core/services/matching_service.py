@@ -2,7 +2,6 @@
 
 from typing import Any, cast
 
-from PayU_Processing_Service.src.schemas.purchase_order_schema import PurchaseOrderRequest
 from sqlalchemy.orm import selectinload
 
 from src.control.validation_agent.validation_graph import invoke_graph
@@ -23,6 +22,7 @@ from src.data.repositories.base_repository import (
 from src.schemas.graph_output_schema import GraphResult
 from src.schemas.invoice_schema import InvoiceRequest
 from src.schemas.matching_schema import InvoiceMatchingBase
+from src.schemas.purchase_order_schema import PurchaseOrderRequest
 
 
 async def validateInvoicePo(group_id: int, operation_type: str) -> GraphResult:

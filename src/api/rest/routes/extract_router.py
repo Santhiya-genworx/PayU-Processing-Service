@@ -1,19 +1,13 @@
 """This module defines the API routes for extracting data from invoices and purchase orders. It includes endpoints for uploading files, checking the status of extraction jobs, and retrieving the results of the extraction process. The routes are organized under the "/extract" prefix and utilize FastAPI's APIRouter for modularity. The module also interacts with a Redis queue to manage background tasks for data extraction and uses utility functions for file handling and job status management."""
 
-import uuid
 from typing import Any
 
 from fastapi import APIRouter, File, UploadFile
 
 from src.core.services.extraction_service import extractData, getExtractionStatus
-from src.data.clients.redis import extract_queue
 from src.schemas.docs_schema import QueueResponse
-from src.tasks.payu_tasks import execute_task
-from src.utils.file_upload import save_file
-from src.utils.job_status import get_job_status, set_job_status
 
 extract_router = APIRouter(prefix="/extract")
-
 
 
 @extract_router.post("/invoice")
