@@ -1,3 +1,5 @@
+"""Module defining the validation graph for processing and validating invoices against purchase orders. This module utilizes a state graph to orchestrate the flow of data through various agent functions responsible for matching vendors, line items, prices, and quantities. The graph is designed to handle different scenarios based on the presence or absence of purchase orders, routing the flow accordingly to ensure accurate validation. The main function, invoke_graph, serves as the entry point for invoking the graph with the necessary invoice and purchase order data, returning the validation results in a structured format. The module also includes error handling to manage exceptions that may arise during the validation process, ensuring that meaningful error messages are provided when issues occur."""
+
 from typing import Any, cast
 
 from langgraph.graph import END, START, StateGraph
@@ -45,6 +47,7 @@ async def invoke_graph(
     invoice_data: list[InvoiceRequest],
     po_data: list[PurchaseOrderRequest],
 ) -> GraphResult:
+    """Function to invoke the validation graph with the provided invoice and purchase order data. This function initializes the agent state based on the input parameters and then invokes the compiled graph to perform the validation process. The result from the graph is processed to return the validation results in a structured format defined by the GraphResult schema. If any errors occur during the graph invocation, they are caught and raised as exceptions with details about the error. Args:   invoice_data (list[InvoiceRequest]): A list of invoice data to be validated against purchase orders. po_data (list[PurchaseOrderRequest]): A list of purchase order data to be used for validation against invoices. Returns:    A GraphResult object containing the results of the validation process, including any matches or discrepancies found between the invoices and purchase orders."""
     try:
         state: AgentState = {
             "invoices": invoice_data,

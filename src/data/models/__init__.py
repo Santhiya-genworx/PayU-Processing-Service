@@ -1,3 +1,5 @@
+"""Module: __init__.py"""
+
 from src.data.models.invoice_model import Invoice as Invoice
 from src.data.models.invoice_model import InvoiceItem as InvoiceItem
 from src.data.models.purchase_order_model import (
