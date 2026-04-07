@@ -8,7 +8,10 @@ from src.data.clients.redis import async_redis, redis_connection
 
 
 class SafeEncoder(json.JSONEncoder):
+    """Custom JSON encoder that safely handles date and datetime objects by converting them to ISO format strings. This encoder can be used when serializing data to JSON, ensuring that any date or datetime objects are properly formatted and do not cause serialization errors. The SafeEncoder class extends the default JSONEncoder and overrides the default method to check for date and datetime instances, converting them to their ISO format representation before serialization."""
+
     def default(self, obj: Any) -> Any:
+        """Override the default method to handle date and datetime objects."""
         if isinstance(obj, (date, datetime)):
             return obj.isoformat()
         return super().default(obj)

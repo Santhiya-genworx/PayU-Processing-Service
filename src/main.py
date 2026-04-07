@@ -24,14 +24,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-"""
-Welcome endpoint to verify that the service is running.
-This can be used for health checks and to confirm that the API is accessible.
-Returns:
-    A JSON response with a welcome message.
-"""
-
 
 @app.get("/")
 def welcome() -> dict[str, str]:
+    """Welcome endpoint to verify that the service is running.
+    This can be used for health checks and to confirm that the API is accessible.
+    Returns:
+        A JSON response with a welcome message.
+    """
+
     return {"message": "Welcome to PayU - Processing Service"}

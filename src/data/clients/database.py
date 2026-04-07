@@ -22,12 +22,6 @@ engine = create_async_engine(
     pool_pre_ping=True,
 )
 
-AsyncSessionFactory = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
-
 
 async def init_db() -> None:
     """Initialize the database by applying any pending migrations. This function is called during the startup event of the API application to ensure that the database schema is up to date before handling any requests. It uses an asynchronous context manager to create a connection to the database and applies migrations using the apply_migrations function from the migrations runner module. If any errors occur during the database initialization process, they will be raised and can be handled by the calling function."""

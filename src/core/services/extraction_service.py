@@ -3,12 +3,33 @@
 import base64
 import io
 import os
+import uuid
 from typing import Any
 
 import fitz
+from fastapi import UploadFile
 
 from src.control.extractor_agent.extractor_graph import invoke_graph
-from src.utils.file_upload import download_from_gcs
+from src.core.exceptions.exceptions import BadRequestException
+from src.data.clients.redis import extract_queue
+from src.schemas.docs_schema import QueueResponse
+from src.tasks.payu_tasks import execute_task
+from src.utils.file_upload import download_from_gcs, save_file
+from src.utils.job_status import get_job_status, set_job_status
+
+
+def enqueue_extract_task(file_id: str, task_type: str, filename: str, file_path: str) -> None:
+    """Helper function to enqueue a task for processing uploaded files. This function takes a file ID, task type, payload, and file path as input and enqueues a task in the Redis queue for asynchronous processing. The task is executed using the execute_task function, which handles the business logic for processing the uploaded file based on the specified task type. The job status is managed using the set_job_status function to track the progress of the task. Args:   file_id (str): A unique identifier for the uploaded file. task_type (str): The type of task to be executed (e.g., "upload_invoice", "override_po"). payload (dict[str, Any]): Additional data required for processing the task. file_path (str): The path to the uploaded file that needs to be processed. Returns:    None"""
+    extract_queue.enqueue(
+        execute_task,
+        {
+            "job_id": file_id,
+            "task_type": task_type,
+            "filename": filename,
+            "gcs_path": file_path,
+        },
+        job_timeout=600,
+    )
 
 
 def detect_file_type(filename: str) -> str:
@@ -75,3 +96,34 @@ async def extract_text_from_document(
 
     except Exception:
         raise
+
+
+async def extractData(file: UploadFile, document_type: str) -> QueueResponse:
+    """Function to handle the extraction of data from an uploaded file. This function generates a unique file ID, saves the uploaded file to a specified location, and enqueues a background task to process the file extraction. The job status is set to "processing" when the task is enqueued, and the client receives a response containing the status and a unique file ID that can be used to check the extraction status later. Args:   file (UploadFile): The uploaded file to be processed for data extraction.   document_type (str): The type of document being extracted (e.g., "invoice", "purchase_order"). Returns:    A QueueResponse object containing the status of the extraction process and a unique file ID for tracking the job."""
+    try:
+        file_id = str(uuid.uuid4())
+        file_path, _, _ = await save_file(file, document_type)
+        filename = file.filename or "upload"
+
+        set_job_status(file_id, "processing")
+
+        enqueue_extract_task(file_id, f"extract_{document_type}", filename, file_path)
+
+        return QueueResponse(status="processing", file_id=file_id)
+
+    except Exception as err:
+        raise BadRequestException(f"Data extraction failed: {str(err)}") from err
+
+
+async def getExtractionStatus(file_id: str) -> dict[str, Any]:
+    """Function to retrieve the status of an extraction job based on the provided file ID. This function queries the job status from a Redis store using the file ID as a key. If the job is still processing, it returns a status of "processing". If the job has completed, it returns the relevant information about the job, such as success status, messages, or any additional details related to the uploaded file. Args:   file_id (str): The unique identifier for the uploaded file whose extraction status is being checked. Returns:    A dictionary containing the status of the extraction job and any relevant information if the job has completed."""
+    try:
+        job: dict[str, Any] | None = await get_job_status(file_id)
+
+        if job is None:
+            return {"status": "processing"}
+
+        return job
+
+    except Exception as err:
+        raise BadRequestException(f"Status check failed: {str(err)}") from err

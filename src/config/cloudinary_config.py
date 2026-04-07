@@ -1,3 +1,5 @@
+"""Module: cloudinary_config.py"""
+
 import cloudinary
 
 from src.config.settings import settings
